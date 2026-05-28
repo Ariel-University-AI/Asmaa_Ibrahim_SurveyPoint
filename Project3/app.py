@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import joblib
 import io
 import glob
 import os
-import subprocess
+from sklearn.ensemble import IsolationForest
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -57,11 +56,28 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 @st.cache_resource
 def load_models():
-    model_path = os.path.join(BASE_DIR, "Model", "model.pkl")
-    if not os.path.exists(model_path):
-        os.makedirs(os.path.join(BASE_DIR, "Model"), exist_ok=True)
-        subprocess.run(["python", os.path.join(BASE_DIR, "trainmodel.py")], cwd=BASE_DIR)
-    return joblib.load(model_path)
+    models = {}
+    for folder in ["1", "2", "3", "4"]:
+        files = glob.glob(os.path.join(BASE_DIR, "..", f"coordinates_{folder}.csv")) + \
+                glob.glob(os.path.join(BASE_DIR, "..", f"coordinates_{folder}.CSV")) + \
+                glob.glob(os.path.join(BASE_DIR, "DATA", folder, "*.csv")) + \
+                glob.glob(os.path.join(BASE_DIR, "DATA", folder, "*.CSV"))
+        if files:
+            for enc in ["utf-8-sig", "cp1255", "utf-8", "latin-1"]:
+                try:
+                    df = pd.read_csv(files[0], encoding=enc)
+                    df.columns = ["שם נקודה", "Y", "X"]
+                    df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
+                    df["X"] = pd.to_numeric(df["X"], errors="coerce")
+                    df = df.dropna(subset=["Y", "X"])
+                    if len(df) > 0:
+                        m = IsolationForest(contamination=0.05, random_state=42)
+                        m.fit(df[["Y", "X"]])
+                        models[folder] = m
+                        break
+                except:
+                    continue
+    return models
 
 models = load_models()
 
@@ -115,8 +131,14 @@ if uploaded is not None:
             </div>
             """, unsafe_allow_html=True)
 
-            model = models[folder]
-            df["תקין"] = model.predict(df[["Y", "X"]])
+            if folder in models:
+                model = models[folder]
+                df["תקין"] = model.predict(df[["Y", "X"]])
+            else:
+                m = IsolationForest(contamination=0.05, random_state=42)
+                m.fit(df[["Y", "X"]])
+                df["תקין"] = m.predict(df[["Y", "X"]])
+
             df["סטטוס"] = df["תקין"].apply(lambda x: "✅ תקין" if x == 1 else "⚠️ חשוד")
 
             חריגים = len(df[df["תקין"] == -1])
