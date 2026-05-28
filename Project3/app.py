@@ -183,7 +183,7 @@ if uploaded is not None:
             folder = f
             break
 
-    files = glob.glob(os.path.join(BASE_DIR, "DATA", folder, "*.csv")) + glob.glob(os.path.join(BASE_DIR, "DATA", folder, "*.CSV"))
+    files = glob.glob(os.path.join(BASE_DIR, "..", f"coordinates_{folder}.csv")) + glob.glob(os.path.join(BASE_DIR, "..", f"coordinates_{folder}.CSV"))
 
     if not files:
         st.error("❌ לא נמצא קובץ קואורדינטות")
