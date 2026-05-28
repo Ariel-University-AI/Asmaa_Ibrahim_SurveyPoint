@@ -57,11 +57,12 @@ st.markdown("<br>", unsafe_allow_html=True)
 @st.cache_resource
 def load_models():
     models = {}
+    repo_root = os.path.join(BASE_DIR, "..")
     for folder in ["1", "2", "3", "4"]:
-        files = glob.glob(os.path.join(BASE_DIR, "..", f"coordinates_{folder}.csv")) + \
-                glob.glob(os.path.join(BASE_DIR, "..", f"coordinates_{folder}.CSV")) + \
-                glob.glob(os.path.join(BASE_DIR, "DATA", folder, "*.csv")) + \
-                glob.glob(os.path.join(BASE_DIR, "DATA", folder, "*.CSV"))
+        files = glob.glob(os.path.join(repo_root, f"coordinates_{folder}.csv")) + \
+                glob.glob(os.path.join(repo_root, f"coordinates_{folder}.CSV")) + \
+                glob.glob(os.path.join(repo_root, f"*oordinates_{folder}.csv")) + \
+                glob.glob(os.path.join(repo_root, f"*oordinates_{folder}.CSV"))
         if files:
             for enc in ["utf-8-sig", "cp1255", "utf-8", "latin-1"]:
                 try:
@@ -96,20 +97,21 @@ with col_info:
     """, unsafe_allow_html=True)
 
 if uploaded is not None:
-    name = uploaded.name.upper()
+    name = uploaded.name.upper().replace(" ", "")
     folder = "1"
     for f in ["1", "2", "3", "4"]:
-        if f"DATA{f}" in name:
+        if f"DATA{f}" in name or name == f"DATA{f}.TIF":
             folder = f
             break
 
-    files = glob.glob(os.path.join(BASE_DIR, "..", f"coordinates_{folder}.csv")) + \
-            glob.glob(os.path.join(BASE_DIR, "..", f"coordinates_{folder}.CSV")) + \
-            glob.glob(os.path.join(BASE_DIR, "DATA", folder, "*.csv")) + \
-            glob.glob(os.path.join(BASE_DIR, "DATA", folder, "*.CSV"))
+    repo_root = os.path.join(BASE_DIR, "..")
+    files = glob.glob(os.path.join(repo_root, f"coordinates_{folder}.csv")) + \
+            glob.glob(os.path.join(repo_root, f"coordinates_{folder}.CSV")) + \
+            glob.glob(os.path.join(repo_root, f"*oordinates_{folder}.csv")) + \
+            glob.glob(os.path.join(repo_root, f"*oordinates_{folder}.CSV"))
 
     if not files:
-        st.error("❌ לא נמצא קובץ קואורדינטות")
+        st.error(f"❌ לא נמצא קובץ קואורדינטות לתיקייה {folder}")
     else:
         df = None
         for enc in ["utf-8-sig", "cp1255", "utf-8", "latin-1"]:
@@ -140,7 +142,6 @@ if uploaded is not None:
                 df["תקין"] = m.predict(df[["Y", "X"]])
 
             df["סטטוס"] = df["תקין"].apply(lambda x: "✅ תקין" if x == 1 else "⚠️ חשוד")
-
             חריגים = len(df[df["תקין"] == -1])
             תקינות = len(df[df["תקין"] == 1])
             אחוז = round((תקינות / len(df)) * 100, 1)
