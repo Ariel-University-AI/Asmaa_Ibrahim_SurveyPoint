@@ -411,15 +411,32 @@ with tab_ocr:
     st.markdown('<div class="section-title">📄 חילוץ קואורדינטות מתיק חישובים</div>',
                 unsafe_allow_html=True)
 
-    st.markdown("""
-    <div class="card">
-    <b style="color:#FFD700">🎓 מצב לימוד (מומלץ לדמו):</b>
-    <span style="color:#90e0ef"> העלה TIF + CSV קיים → המערכת <b>מאמתת</b> את ה-OCR מול הערכים הידועים → דיוק גבוה!</span><br><br>
-    <b style="color:#00b4d8">🔍 מצב OCR בלבד:</b>
-    <span style="color:#90e0ef"> העלה TIF בלבד → חילוץ אוטומטי ללא אימות</span>
-    </div>
-    """, unsafe_allow_html=True)
+    # ── Gemini API Key ──────────────────────────────────────────────────────
+    st.markdown('<div class="section-title">🤖 מפתח Gemini AI (לחילוץ מלא)</div>',
+                unsafe_allow_html=True)
 
+    col_key, col_info = st.columns([3, 2])
+    with col_key:
+        gemini_key = st.text_input(
+            "הכניסי את ה-Gemini API Key שלך:",
+            type="password",
+            placeholder="AIzaSy...",
+            key="gemini_key",
+        )
+    with col_info:
+        if gemini_key:
+            st.success("✅ Gemini מוכן — יחלץ **את כל הנקודות**!")
+        else:
+            st.markdown("""
+            <div class="card" style="font-size:0.9rem">
+            <b style="color:#FFD700">ללא Key:</b> <span style="color:#90e0ef">Tesseract (~15% נקודות)</span><br>
+            <b style="color:#00ff88">עם Key:</b> <span style="color:#90e0ef">Gemini (~99% נקודות) ✨</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # ── קבצים ──────────────────────────────────────────────────────────────
     col_tif, col_csv = st.columns(2)
     with col_tif:
         uploaded = st.file_uploader(
@@ -429,7 +446,7 @@ with tab_ocr:
         )
     with col_csv:
         ref_csv = st.file_uploader(
-            "📊 קובץ CSV לימוד (אופציונלי — לדיוק גבוה)",
+            "📊 קובץ CSV לאימות (אופציונלי)",
             type=["csv", "CSV"],
             key="ref_csv",
         )
@@ -491,29 +508,31 @@ with tab_ocr:
                 prog.progress(int(done / total * 100))
                 stat.text(f"מעבד עמוד {done} מתוך {total}...")
 
-            # בחירת מנוע OCR
-            use_combined = st.checkbox(
-                "🔀 מצב משולב — Tesseract + EasyOCR (דיוק גבוה יותר, לוקח יותר זמן)",
-                value=False, key="combined_mode"
-            )
-            if use_combined:
-                est_min = round(max_pages * 62 / 60, 1)
-                st.info(f"⏱️ זמן משוער: ~{est_min} דקות (Tesseract + EasyOCR)")
+            # בחירת מנוע
+            if gemini_key:
+                est_min = round(total_pages * 4 / 60, 1)
+                st.success(f"✨ Gemini Vision — ~{est_min} דקות לכל {total_pages} עמודים")
+                mode = "✨ Gemini Vision AI"
             else:
-                est_min = round(max_pages * 2.5 / 60, 1)
-                st.info(f"⏱️ זמן משוער: ~{est_min} דקות (Tesseract בלבד)")
-
-            if ref_df is not None:
-                mode = "🎓 מצב לימוד (CSV + OCR)"
-            elif use_combined:
-                mode = "🔀 Tesseract + EasyOCR"
-            else:
-                mode = "🔍 Tesseract בלבד"
+                use_combined = st.checkbox(
+                    "🔀 מצב משולב — Tesseract + EasyOCR",
+                    value=False, key="combined_mode"
+                )
+                mode = "🔀 Tesseract + EasyOCR" if use_combined else "🔍 Tesseract בלבד"
+                est_min = round(max_pages * (62 if use_combined else 2.5) / 60, 1)
+                st.info(f"⏱️ ~{est_min} דקות")
 
             with st.spinner(f"מריץ חילוץ — {mode}..."):
                 try:
                     if fname.endswith(".pdf"):
                         df_ocr = extract_from_pdf(file_bytes)
+                    elif gemini_key:
+                        from extractor import extract_with_gemini
+                        df_ocr = extract_with_gemini(
+                            file_bytes,
+                            api_key=gemini_key,
+                            progress_cb=cb,
+                        )
                     else:
                         df_ocr = extract_from_tif(
                             file_bytes,

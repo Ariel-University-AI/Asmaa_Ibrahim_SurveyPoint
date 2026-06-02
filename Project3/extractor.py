@@ -491,6 +491,93 @@ def extract_with_csv_reference(
                      ignore_index=True).reset_index(drop=True)
 
 
+def extract_with_gemini(
+    tif_bytes: bytes,
+    api_key: str,
+    progress_cb=None,
+) -> pd.DataFrame:
+    """
+    חילוץ קואורדינטות באמצעות Gemini Vision — דיוק גבוה על כתב יד.
+    מודל: gemini-1.5-flash (חינם, 15 בקשות/דקה)
+    """
+    import google.generativeai as genai
+    import json, time
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+    PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך.
+חלץ את כל הקואורדינטות מהטבלה.
+
+חפש בכל סוגי הטבלאות:
+- חשוב מצולע (traverse): עמודות Y ו-X בצד ימין
+- חשוב קואורדינטות (נקודות בינים): עמודות A/Y ו-A/X
+- חשוב שטחים (area): טבלה עם מספר נקודה, Y, X
+
+החזר JSON בלבד, ללא טקסט נוסף:
+[{"name": "שם_נקודה", "Y": 123.45, "X": 678.90}, ...]
+
+אם אין קואורדינטות בדף — החזר: []"""
+
+    img = Image.open(io.BytesIO(tif_bytes))
+    n_pages = getattr(img, 'n_frames', 1)
+    all_points = []
+
+    for page_num in range(n_pages - 1, -1, -1):  # מהאחרון לראשון
+        img.seek(page_num)
+        if not _has_content(img):
+            if progress_cb: progress_cb(n_pages - page_num, n_pages)
+            continue
+
+        # המר לRGB ושמור כ-JPEG בזיכרון
+        page_img = img.convert('RGB')
+        buf = io.BytesIO()
+        page_img.save(buf, format='JPEG', quality=90)
+        buf.seek(0)
+        pil_page = Image.open(buf)
+
+        try:
+            response = model.generate_content(
+                [pil_page, PROMPT],
+                generation_config={"temperature": 0}
+            )
+            text = response.text.strip()
+            # נקה markdown אם יש
+            text = re.sub(r'^```json\s*', '', text)
+            text = re.sub(r'\s*```$', '', text)
+            text = text.strip()
+
+            parsed = json.loads(text)
+            for item in parsed:
+                try:
+                    name = str(item.get('name', '')).strip()
+                    y = float(str(item.get('Y', 0)).replace(',', '.'))
+                    x = float(str(item.get('X', 0)).replace(',', '.'))
+                    if name and y and x:
+                        all_points.append({'שם נקודה': name, 'Y': y, 'X': x})
+                except Exception:
+                    continue
+
+        except Exception as e:
+            print(f"Page {page_num+1} Gemini error: {e}")
+
+        # Gemini: 15 בקשות/דקה → המתן מעט
+        time.sleep(4)
+
+        if progress_cb:
+            progress_cb(n_pages - page_num, n_pages)
+
+    if not all_points:
+        return pd.DataFrame(columns=['שם נקודה', 'Y', 'X'])
+
+    df = pd.DataFrame(all_points)
+    df['Y'] = pd.to_numeric(df['Y'], errors='coerce')
+    df['X'] = pd.to_numeric(df['X'], errors='coerce')
+    df = df.dropna(subset=['Y', 'X'])
+    df = df.drop_duplicates(subset=['שם נקודה']).reset_index(drop=True)
+    return df
+
+
 def extract_from_pdf(file_bytes: bytes) -> pd.DataFrame:
     try:
         import pdfplumber
