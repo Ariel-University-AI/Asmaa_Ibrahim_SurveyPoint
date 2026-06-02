@@ -425,7 +425,20 @@ with tab_ocr:
         )
     with col_info:
         if gemini_key:
-            st.success("✅ Gemini מוכן — יחלץ **את כל הנקודות**!")
+            # בדיקת חיבור
+            if st.button("🔗 בדוק חיבור", key="test_gemini"):
+                try:
+                    from google import genai as _genai
+                    _c = _genai.Client(api_key=gemini_key)
+                    _r = _c.models.generate_content(
+                        model="gemini-1.5-flash",
+                        contents=["Say OK in one word"]
+                    )
+                    st.success(f"✅ Gemini מחובר! תשובה: {_r.text.strip()[:20]}")
+                except Exception as _e:
+                    st.error(f"❌ שגיאה: {_e}")
+            else:
+                st.success("✅ Gemini מוכן — יחלץ **את כל הנקודות**!")
         else:
             st.markdown("""
             <div class="card" style="font-size:0.9rem">

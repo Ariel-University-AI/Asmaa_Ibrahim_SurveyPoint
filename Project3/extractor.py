@@ -536,7 +536,7 @@ def extract_with_gemini(
         try:
             from google.genai import types as gtypes
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-1.5-flash",
                 contents=[
                     gtypes.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
                     PROMPT,
@@ -562,8 +562,11 @@ def extract_with_gemini(
 
         except Exception as e:
             import traceback
-            print(f"Page {page_num+1} Gemini error: {e}")
+            err_msg = f"Page {page_num+1} error: {type(e).__name__}: {e}"
+            print(err_msg)
             traceback.print_exc()
+            all_points.append({'שם נקודה': f'__ERROR_P{page_num+1}',
+                                'Y': -1, 'X': str(e)[:80]})
 
         # Gemini: 15 בקשות/דקה → המתן מעט
         time.sleep(4)
