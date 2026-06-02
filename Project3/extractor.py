@@ -177,19 +177,65 @@ def _to_rows(items: list, tol: int = 22) -> dict:
     return {k: sorted(v) for k, v in sorted(rows.items())}
 
 
-def _extract_page_ocr_only(items: list, img_w: int) -> list:
-    """
-    מאחוזים שנלמדו: Y=67-82%, X=80-97%
-    שמות נקודה: <14% (שמאל) או >93% (ימין)
-    """
-    Y_START = int(img_w * 0.67)
-    Y_END   = int(img_w * 0.82)
-    X_START = int(img_w * 0.80)
-    X_END   = int(img_w * 0.97)
-    L_NAME  = int(img_w * 0.14)
-    R_NAME  = int(img_w * 0.93)
+def _ocr_strip(pil_img, psm=6) -> list:
+    """OCR על פס תמונה — מחזיר [(cx, cy, text, conf)]"""
+    data = pytesseract.image_to_data(
+        pil_img, output_type=pytesseract.Output.DICT,
+        lang='eng', config=f'--oem 1 --psm {psm}',
+    )
+    items = []
+    for i in range(len(data['text'])):
+        t = data['text'][i].strip()
+        c = int(data['conf'][i])
+        if not t or c < 15:
+            continue
+        cx = data['left'][i] + data['width'][i] // 2
+        cy = data['top'][i] + data['height'][i] // 2
+        items.append((cx, cy, t, c / 100.0))
+    return items
 
-    rows = _to_rows(items)
+
+def _extract_page_ocr_only(arr: np.ndarray) -> list:
+    """
+    גישה משולבת:
+    - OCR על כל הדף (psm=11) לקואורדינטות ושמות
+    - OCR נוסף על גזרת Y+X בלבד (psm=11) לדיוק נוסף
+    - אחוזי עמודה שנלמדו מהדוגמאות: Y=62-81%, X=81-92%, שמות<14% ו>92%
+    """
+    from PIL import Image as _PIL
+    h, w = arr.shape[:2]
+    img = _PIL.fromarray(arr)
+
+    # OCR על כל הדף
+    items_full = _ocr(arr)
+
+    # OCR נוסף על גזרת YX בלבד (60-93%)
+    y0, y1 = int(w * 0.60), int(w * 0.93)
+    strip_yx = img.crop((y0, 0, y1, h))
+    items_yx_raw = _ocr_strip(strip_yx, psm=11)
+    # המר חזרה לקואורדינטות הדף המלא
+    items_yx = [(cx + y0, cy, text, conf)
+                for cx, cy, text, conf in items_yx_raw]
+
+    # שלב: הוסף פריטים מהגזרה לרשימה הכוללת (מניעת כפילויות ע"י tolerance)
+    all_items = list(items_full)
+    for item in items_yx:
+        cx, cy, text, conf = item
+        # הוסף רק אם אין פריט קרוב כבר
+        dup = any(abs(cx - ex) < 30 and abs(cy - ey) < 15 and text == et
+                  for ex, ey, et, _ in all_items)
+        if not dup:
+            all_items.append(item)
+
+    # הגדרת אזורים
+    Y_START = int(w * 0.62)
+    Y_END   = int(w * 0.81)
+    X_START = int(w * 0.81)
+    X_END   = int(w * 0.92)
+    L_NAME  = int(w * 0.14)
+    R_NAME  = int(w * 0.92)
+
+    rows = _to_rows(all_items)
     points = []
 
     for row_y, row_items in rows.items():
@@ -197,12 +243,10 @@ def _extract_page_ocr_only(items: list, img_w: int) -> list:
 
         for cx, text in row_items:
             nums = _find_numbers(text)
-
             if cx <= L_NAME and _is_name(text):
                 l_names.append(_clean_name(text))
             if cx >= R_NAME and _is_name(text):
                 r_names.append(_clean_name(text))
-
             for v in nums:
                 if Y_START <= cx < Y_END and _is_coord(v):
                     y_vals.append(v)
@@ -249,7 +293,7 @@ def extract_from_tif(
             continue
         arr = _prepare(img)
         try:
-            pts = _extract_page_ocr_only(_ocr(arr), arr.shape[1])
+            pts = _extract_page_ocr_only(arr)
             all_points.extend(pts)
         except Exception as e:
             print(f"Page {page_num+1}: {e}")
@@ -262,7 +306,36 @@ def extract_from_tif(
     df = pd.DataFrame(all_points)
     df['Y'] = pd.to_numeric(df['Y'], errors='coerce')
     df['X'] = pd.to_numeric(df['X'], errors='coerce')
-    return df.dropna(subset=['Y','X']).drop_duplicates('שם נקודה').reset_index(drop=True)
+    df = df.dropna(subset=['Y', 'X'])
+
+    # סנן נקודות שגויות
+    def _is_valid_row(row):
+        name_str = re.sub(r'[^0-9]', '', str(row['שם נקודה']))
+        name_num = float(name_str) if name_str else 0
+        y, x = row['Y'], row['X']
+        # קטן מדי
+        if x < 100 or y < 150:
+            return False
+        # Y בטווח חשוד — לא מקומי (≤4000) ולא ITM (≥100000)
+        if 4000 < y < 100000:
+            return False
+        # שם נקודה ארוך מדי (OCR שגוי כגון 69258)
+        name_digits = re.sub(r'[^0-9]', '', str(row['שם נקודה']))
+        if len(name_digits) > 4:
+            return False
+        # X שווה לשם הנקודה — שגיאה
+        if name_num > 0 and abs(x - name_num) < max(5, name_num * 0.02):
+            return False
+        # Y שווה לשם הנקודה — שגיאה
+        if name_num > 0 and abs(y - name_num) < max(5, name_num * 0.02):
+            return False
+        # Y ו-X זהים — שגיאה
+        if abs(y - x) < 2:
+            return False
+        return True
+
+    df = df[df.apply(_is_valid_row, axis=1)]
+    return df.drop_duplicates('שם נקודה').reset_index(drop=True)
 
 
 def extract_from_pdf(file_bytes: bytes) -> pd.DataFrame:
