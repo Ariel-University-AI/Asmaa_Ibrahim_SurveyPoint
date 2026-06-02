@@ -564,7 +564,15 @@ def extract_with_gemini(
                 {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
                 {"text": PROMPT}
             ]}]}
-            resp = requests.post(API_URL, json=payload, headers=HDR, timeout=60)
+            # retry עם המתנה אם יש rate limit (429)
+            for attempt in range(3):
+                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=60)
+                if resp.status_code == 429:
+                    wait = 30 * (attempt + 1)
+                    print(f"Rate limit — ממתין {wait}s...")
+                    time.sleep(wait)
+                    continue
+                break
             resp.raise_for_status()
             text = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
             debug_log.append(f"P{page_num+1}: {text[:120]}")
@@ -595,8 +603,8 @@ def extract_with_gemini(
             all_points.append({'שם נקודה': f'__ERROR_P{page_num+1}',
                                 'Y': -1, 'X': str(e)[:80]})
 
-        # Gemini: 15 בקשות/דקה → המתן מעט
-        time.sleep(4)
+        # Gemini free tier: 15 RPM → 5 שניות בין בקשות
+        time.sleep(5)
 
         if progress_cb:
             progress_cb(n_pages - page_num, n_pages)
