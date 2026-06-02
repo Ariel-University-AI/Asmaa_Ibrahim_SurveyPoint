@@ -548,13 +548,14 @@ def extract_with_gemini(
             text = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
             debug_log.append(f"P{page_num+1}: {text[:120]}")
             print(f"Page {page_num+1}: {text[:80]}")
-            # חלץ JSON — חפש [ ... ] בתוך התשובה
-            match = re.search(r'\[.*?\]', text, re.DOTALL)
-            if not match:
-                print(f"Page {page_num+1}: no JSON array found in: {text[:80]}")
+            # חלץ JSON — greedy: מהסוגר הראשון לאחרון
+            start = text.find('[')
+            end   = text.rfind(']')
+            if start == -1 or end == -1 or end <= start:
+                print(f"Page {page_num+1}: no JSON: {text[:100]}")
                 continue
-            text = match.group(0)
-            parsed = json.loads(text)
+            json_str = text[start:end+1]
+            parsed = json.loads(json_str)
             for item in parsed:
                 try:
                     name = str(item.get('name', '')).strip()
