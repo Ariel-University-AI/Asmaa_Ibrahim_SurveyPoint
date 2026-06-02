@@ -430,11 +430,15 @@ with tab_ocr:
                 try:
                     from google import genai as _genai
                     import requests as _req
-                    _url = (f"https://generativelanguage.googleapis.com"
-                            f"/v1beta/models/gemini-1.5-flash:generateContent"
-                            f"?key={gemini_key}")
-                    _res = _req.post(_url, json={"contents": [{"parts":
-                           [{"text": "Say OK"}]}]}, timeout=15)
+                    _base = ("https://generativelanguage.googleapis.com"
+                             "/v1beta/models/gemini-1.5-flash:generateContent")
+                    if gemini_key.startswith("AIzaSy"):
+                        _url, _hdr = f"{_base}?key={gemini_key}", {}
+                    else:
+                        _url, _hdr = _base, {"x-goog-api-key": gemini_key}
+                    _res = _req.post(_url, headers=_hdr,
+                           json={"contents": [{"parts": [{"text": "Say OK"}]}]},
+                           timeout=15)
                     _res.raise_for_status()
                     _r = type('R', (), {'text': _res.json()
                            ['candidates'][0]['content']['parts'][0]['text']})()

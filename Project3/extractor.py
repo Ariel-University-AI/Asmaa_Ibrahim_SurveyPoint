@@ -502,10 +502,14 @@ def extract_with_gemini(
     """
     import requests, base64, json, time
 
-    API_URL = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-1.5-flash:generateContent?key={api_key}"
-    )
+    BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    # תמיכה בשני פורמטי Key: AIzaSy (query param) ו-AQ. (header)
+    if api_key.startswith("AIzaSy"):
+        API_URL  = f"{BASE_URL}?key={api_key}"
+        API_HDR  = {}
+    else:
+        API_URL  = BASE_URL
+        API_HDR  = {"x-goog-api-key": api_key}
 
     PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך.
 חלץ את כל הקואורדינטות מהטבלה.
@@ -541,7 +545,7 @@ def extract_with_gemini(
                 {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
                 {"text": PROMPT}
             ]}]}
-            resp = requests.post(API_URL, json=payload, timeout=60)
+            resp = requests.post(API_URL, json=payload, headers=API_HDR, timeout=60)
             resp.raise_for_status()
             text = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
             print(f"Page {page_num+1}: Gemini OK, {len(text)} chars")
