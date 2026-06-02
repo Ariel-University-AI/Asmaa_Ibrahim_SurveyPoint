@@ -502,14 +502,11 @@ def extract_with_gemini(
     """
     import requests, base64, json, time
 
-    BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-    # תמיכה בשני פורמטי Key: AIzaSy (query param) ו-AQ. (header)
+    BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     if api_key.startswith("AIzaSy"):
-        API_URL  = f"{BASE_URL}?key={api_key}"
-        API_HDR  = {}
+        API_URL, API_HDR = f"{BASE_URL}?key={api_key}", {}
     else:
-        API_URL  = BASE_URL
-        API_HDR  = {"x-goog-api-key": api_key}
+        API_URL, API_HDR = BASE_URL, {"x-goog-api-key": api_key}
 
     PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך.
 חלץ את כל הקואורדינטות מהטבלה.
