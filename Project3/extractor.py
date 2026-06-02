@@ -500,16 +500,12 @@ def extract_with_gemini(
     חילוץ קואורדינטות באמצעות Gemini Vision — דיוק גבוה על כתב יד.
     מודל: gemini-1.5-flash (חינם, 15 בקשות/דקה)
     """
-    from google import genai as _genai_new
-    import json, time
+    import requests, base64, json, time
 
-    # השתמש בגרסה החדשה עם api_version=v1 (לא v1beta)
-    client = _genai_new.Client(
-        api_key=api_key,
-        http_options={'api_version': 'v1'},
+    API_URL = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-1.5-flash:generateContent?key={api_key}"
     )
-    GEMINI_MODEL = "gemini-1.5-flash"
-    print(f"Using Gemini model: {GEMINI_MODEL} (v1)")
 
     PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך.
 חלץ את כל הקואורדינטות מהטבלה.
@@ -540,16 +536,15 @@ def extract_with_gemini(
         img_bytes = buf.getvalue()
 
         try:
-            from google.genai import types as _gt
-            response = client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=[
-                    _gt.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
-                    PROMPT,
-                ],
-            )
-            text = response.text.strip()
-            print(f"Page {page_num+1}: Gemini responded {len(text)} chars")
+            img_b64 = base64.b64encode(img_bytes).decode()
+            payload = {"contents": [{"parts": [
+                {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
+                {"text": PROMPT}
+            ]}]}
+            resp = requests.post(API_URL, json=payload, timeout=60)
+            resp.raise_for_status()
+            text = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+            print(f"Page {page_num+1}: Gemini OK, {len(text)} chars")
             # נקה markdown אם יש
             text = re.sub(r'^```json\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
