@@ -5,3 +5,7 @@ scikit-learn
 ezdxf
 joblib
 openpyxl
+easyocr
+Pillow
+numpy
+pdfplumber
