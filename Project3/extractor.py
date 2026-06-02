@@ -167,6 +167,31 @@ def _is_matzola_page(rows) -> bool:
     return False
 
 
+# ── שיפורי מהירות ────────────────────────────────────────────────────────────
+
+# רזולוציה מקסימלית לפני OCR — מקטין זמן עיבוד ב-~75%
+MAX_WIDTH = 900
+
+def _resize_for_ocr(img: Image.Image) -> np.ndarray:
+    """מקטין תמונה אם רחבה מדי, שומר יחס גובה-רוחב"""
+    w, h = img.size
+    if w > MAX_WIDTH:
+        ratio = MAX_WIDTH / w
+        img = img.resize((MAX_WIDTH, int(h * ratio)), Image.LANCZOS)
+    return np.array(img.convert('RGB'))
+
+
+def _has_enough_text(img: Image.Image, min_density=0.03, max_density=0.6) -> bool:
+    """
+    בודק צפיפות פיקסלים שחורים בתמונה בינארית.
+    עמוד ריק / שער: צפיפות נמוכה → דלג.
+    עמוד שחור לחלוטין (שגיאה): צפיפות גבוהה → דלג.
+    """
+    arr = np.array(img.convert('L'))   # גווני אפור
+    black = (arr < 128).mean()
+    return min_density <= black <= max_density
+
+
 # ── עיבוד עמוד בודד ──────────────────────────────────────────────────────────
 
 def _process_page(img_array) -> list:
@@ -187,16 +212,26 @@ def extract_from_tif(file_bytes: bytes, progress_cb=None) -> pd.DataFrame:
     """
     מקבל bytes של קובץ TIF רב-עמודי,
     מחזיר DataFrame עם עמודות: שם נקודה, Y, X
+    שיפורי מהירות: דילוג עמודים ריקים + הקטנת רזולוציה
     """
     img = Image.open(io.BytesIO(file_bytes))
     n_pages = getattr(img, 'n_frames', 1)
 
     all_points = []
+    skipped = 0
 
     for page_num in range(n_pages):
         img.seek(page_num)
-        # דלג על עמודי שער (עמודים עם מעט טקסט)
-        arr = np.array(img.convert('RGB'))
+
+        # שיפור 1 — דלג על עמודים ריקים/שערים
+        if not _has_enough_text(img):
+            skipped += 1
+            if progress_cb:
+                progress_cb(page_num + 1, n_pages)
+            continue
+
+        # שיפור 2 — הקטן רזולוציה לפני OCR
+        arr = _resize_for_ocr(img)
 
         try:
             pts = _process_page(arr)
