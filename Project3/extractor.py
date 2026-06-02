@@ -26,8 +26,8 @@ def _prepare(img: Image.Image) -> np.ndarray:
     import PIL.ImageEnhance as IE
     img = img.convert('L')
     w, h = img.size
-    if w < 1600:
-        img = img.resize((1600, int(h * 1600 / w)), Image.LANCZOS)
+    # תמיד שנה ל-1600px — גם הקטנה (לאחידות)
+    img = img.resize((1600, int(h * 1600 / w)), Image.LANCZOS)
     img = IE.Contrast(img).enhance(2.0)
     img = IE.Sharpness(img).enhance(2.0)
     return np.array(img.convert('RGB'))
@@ -86,6 +86,7 @@ def _ocr_strip(pil_img, psm=11, extra='') -> list:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _find_numbers(text: str) -> list:
+    text = text.replace(',', '.')   # תיקון: 402,32 → 402.32
     nums = []
     for m in re.finditer(r'\d+\.\d+', text):
         try: nums.append(float(m.group()))
@@ -426,10 +427,13 @@ def extract_with_csv_reference(
         for cx, cy, text, conf in items:
             for v in _find_numbers(text):
                 for truth_y, pt in known_Y.items():
-                    if abs(v - truth_y) <= tolerance:
+                    # בדיקה רגילה + בדיקת suffix (OCR קרא 644.32 במקום 151644.32)
+                    if abs(v - truth_y) <= tolerance or \
+                       abs(truth_y % 1000 - v) <= tolerance:
                         found.setdefault(pt, {})['Y'] = truth_y
                 for truth_x, pt in known_X.items():
-                    if abs(v - truth_x) <= tolerance:
+                    if abs(v - truth_x) <= tolerance or \
+                       abs(truth_x % 1000 - v) <= tolerance:
                         found.setdefault(pt, {})['X'] = truth_x
 
         if progress_cb: progress_cb(page_num + 1, n_pages)
