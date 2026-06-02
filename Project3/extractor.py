@@ -15,13 +15,8 @@ _reader = None
 def _get_reader():
     global _reader
     if _reader is None:
-        from paddleocr import PaddleOCR
-        _reader = PaddleOCR(
-            use_angle_cls=True,
-            lang='en',
-            use_gpu=False,
-            show_log=False,
-        )
+        import easyocr
+        _reader = easyocr.Reader(['en'], gpu=False, verbose=False)
     return _reader
 
 
@@ -236,23 +231,9 @@ def _has_enough_text(img: Image.Image, min_density=0.03, max_density=0.6) -> boo
 
 # ── עיבוד עמוד בודד ──────────────────────────────────────────────────────────
 
-def _paddle_to_standard(paddle_result) -> list:
-    """ממיר פלט PaddleOCR לפורמט אחיד: [(bbox, text, conf), ...]"""
-    items = []
-    if not paddle_result or not paddle_result[0]:
-        return items
-    for line in paddle_result[0]:
-        if line is None:
-            continue
-        bbox, (text, conf) = line
-        items.append((bbox, text, conf))
-    return items
-
-
 def _process_page(img_array) -> list:
     reader = _get_reader()
-    raw = reader.ocr(img_array, cls=True)
-    results = _paddle_to_standard(raw)
+    results = reader.readtext(img_array, detail=1)
     img_w = img_array.shape[1]
     rows = _group_rows(results)
 
@@ -292,8 +273,9 @@ def extract_from_tif(file_bytes: bytes, progress_cb=None, max_pages: int = 0) ->
         try:
             pts = _process_page(arr)
             all_points.extend(pts)
-        except Exception:
-            pass
+        except Exception as e:
+            # המשך לעמוד הבא גם אם יש שגיאה
+            print(f"Page {page_num+1} error: {e}")
 
         if progress_cb:
             progress_cb(page_num + 1, n_pages)

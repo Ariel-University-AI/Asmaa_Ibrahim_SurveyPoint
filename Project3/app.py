@@ -227,16 +227,18 @@ with tab_extract:
         fname = uploaded.name.lower()
 
         # ספור עמודים
+        total_pages = 0
         if not fname.endswith(".pdf"):
-            from PIL import Image
-            import io as _io
-            _img = Image.open(_io.BytesIO(file_bytes))
-            total_pages = getattr(_img, 'n_frames', 1)
-        else:
-            total_pages = 0
+            try:
+                from PIL import Image as _PIL
+                import io as _io
+                _img = _PIL.open(_io.BytesIO(file_bytes))
+                total_pages = getattr(_img, 'n_frames', 1)
+            except Exception:
+                total_pages = 1
 
         st.info(f"📂 קובץ: **{uploaded.name}** | גודל: {len(file_bytes)//1024} KB"
-                + (f" | {total_pages} עמודים" if total_pages else ""))
+                + (f" | **{total_pages} עמודים**" if total_pages > 1 else ""))
 
         # בוחר מספר עמודים
         if total_pages > 1:
