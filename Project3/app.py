@@ -127,8 +127,12 @@ def run_anomaly(df, model):
     return df
 
 
+_show_results_counter = [0]
+
 def show_results(df_res):
     """מציג מטריקות, גרף וטבלה לאחר זיהוי חריגים"""
+    _show_results_counter[0] += 1
+    _key = str(_show_results_counter[0])
     n_total = len(df_res)
     n_ok    = (df_res["pred"] == 1).sum()
     n_bad   = (df_res["pred"] == -1).sum()
@@ -160,7 +164,7 @@ def show_results(df_res):
         xaxis=dict(title="Y (צפון)", gridcolor="rgba(0,180,216,0.15)", zeroline=False),
         yaxis=dict(title="X (מזרח)", gridcolor="rgba(0,180,216,0.15)", zeroline=False),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, key=f"results_chart_{_key}")
 
     with st.expander("📋 טבלה מלאה", expanded=False):
         st.dataframe(df_res.drop(columns=["pred"]), use_container_width=True, height=300,

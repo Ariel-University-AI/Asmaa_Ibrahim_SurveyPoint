@@ -1,5 +1,5 @@
 """
-extractor.py — חילוץ קואורדינטות מתיקי חישובים (TIF/PDF) באמצעות EasyOCR
+extractor.py — חילוץ קואורדינטות מתיקי חישובים (TIF/PDF) באמצעות Tesseract OCR
 """
 
 import re
@@ -12,276 +12,178 @@ from collections import defaultdict
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+# ── הכנת תמונה ───────────────────────────────────────────────────────────────
 
-def _run_tesseract(img_array) -> list:
-    """
-    מריץ Tesseract OCR ומחזיר פורמט אחיד: [(bbox, text, conf), ...]
-    מהיר × 20 לעומת EasyOCR
-    psm=11 = sparse text, מתאים לטפסים עם מספרים מפוזרים
-    """
-    from PIL import Image as _PIL
-    img = _PIL.fromarray(img_array)
-    config = r'--oem 1 --psm 11'
-    data = pytesseract.image_to_data(
-        img, output_type=pytesseract.Output.DICT,
-        lang='eng', config=config,
-    )
-    results = []
-    for i in range(len(data['text'])):
-        text = data['text'][i].strip()
-        conf = int(data['conf'][i])
-        if not text or conf < 20:
-            continue
-        x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
-        bbox = [[x, y], [x+w, y], [x+w, y+h], [x, y+h]]
-        results.append((bbox, text, conf / 100.0))
-    return results
-
-
-# ── ניקוי טקסט OCR ──────────────────────────────────────────────────────────
-
-def _clean(text: str) -> str:
-    """תיקון שגיאות OCR נפוצות במספרים"""
-    text = text.strip()
-    text = text.replace('O', '0').replace('o', '0')
-    text = text.replace('l', '1').replace('I', '1').replace('|', '1')
-    text = text.replace(' ', '').replace(',', '.')
-    text = re.sub(r'[^0-9.\-+]', '', text)
-    return text
-
-
-def _parse_number(text: str):
-    """מחזיר float אם הטקסט מכיל מספר עשרוני תקין, אחרת None"""
-    s = _clean(text)
-    try:
-        v = float(s)
-        return v if v != 0 else None
-    except ValueError:
-        return None
-
-
-def _is_coord(val: float) -> bool:
-    """בודק אם הערך יכול להיות קואורדינטה (מקומי או ITM)"""
-    # מערכת מקומית: 50 – 10000
-    if 50 <= val <= 10000:
-        return True
-    # ITM מלא: 100000 – 900000
-    if 100000 <= val <= 900000:
-        return True
-    return False
-
-
-def _is_point_name(text: str) -> bool:
-    """בודק אם הטקסט מכיל שם נקודה — נקה תווי רעש מ-Tesseract"""
-    # הסר תווי רעש נפוצים
-    t = re.sub(r'[^0-9A-Za-z]', '', text.strip())
-    if not t:
-        return False
-    return bool(re.match(r'^[0-9]{1,5}[A-Za-z]?$', t) or re.match(r'^[A-Z]$', t))
-
-
-def _clean_point_name(text: str) -> str:
-    """מחזיר שם נקודה נקי"""
-    return re.sub(r'[^0-9A-Za-z]', '', text.strip())
-
-
-# ── ניתוח עמוד OCR ───────────────────────────────────────────────────────────
-
-def _group_rows(results, row_tol=18):
-    """מקבץ תוצאות OCR לפי שורות (לפי מיקום y)"""
-    rows = defaultdict(list)
-    for bbox, text, conf in results:
-        if conf < 0.35:
-            continue
-        cy = int(sum(p[1] for p in bbox) / 4)
-        cx = int(sum(p[0] for p in bbox) / 4)
-        key = round(cy / row_tol) * row_tol
-        rows[key].append((cx, cy, text, conf))
-    return {k: sorted(v, key=lambda x: x[0]) for k, v in sorted(rows.items())}
-
-
-def _combine_split_coord(raw_pairs: list):
-    """
-    מאחד מספרים שפוצלו ע"י OCR: (339, 23) → 339.23
-    raw_pairs: רשימת (x_pos, value) ממוינת לפי x
-    """
-    if not raw_pairs:
-        return []
-    raw_pairs = sorted(raw_pairs, key=lambda z: z[0])
-
-    # מספר יחיד גדול — החזר אותו
-    large = [v for _, v in raw_pairs if _is_coord(v)]
-    if len(large) == 1:
-        return large
-
-    # שני מספרים סמוכים — נסה לחבר כ-integer.decimal
-    if len(raw_pairs) >= 2:
-        (x1, v1), (x2, v2) = raw_pairs[0], raw_pairs[1]
-        if x2 - x1 < 160 and v1 >= 50:
-            try:
-                combined = float(f"{int(v1)}.{int(v2)}")
-                if _is_coord(combined):
-                    return [combined]
-            except Exception:
-                pass
-
-    return large or [v for _, v in raw_pairs if v >= 10]
-
-
-def _extract_from_matzola(rows, img_w):
-    """
-    חשוב מצולע — עמודות (שמאל→ימין):
-      שם | זווית | אזימוט | אורך | sn/cs | Y | X | שם
-    אחוזים (מורחבים מעט):
-      שם שמאל : 0–15%
-      Y        : 63–82%
-      X        : 82–99%
-      שם ימין : 94–110%  (+ שוליים לחריגות OCR)
-    """
-    L_NAME = (0,             int(img_w * 0.15))
-    Y_ZONE = (int(img_w * 0.63), int(img_w * 0.82))
-    X_ZONE = (int(img_w * 0.82), int(img_w * 0.99))
-    R_NAME = (int(img_w * 0.94), img_w + 60)   # +60 לשוליות OCR
-
-    points = []
-
-    for row_y, items in rows.items():
-        y_vals, x_raw, l_names, r_names = [], [], [], []
-
-        for cx, cy, text, conf in items:
-            num = _parse_number(text)
-
-            if cx < L_NAME[1]:
-                if _is_point_name(text):
-                    l_names.append(_clean_point_name(text))
-
-            if Y_ZONE[0] <= cx < Y_ZONE[1]:
-                if num and _is_coord(num):
-                    y_vals.append(num)
-
-            if X_ZONE[0] <= cx < X_ZONE[1]:
-                if num is not None and num >= 10:
-                    x_raw.append((cx, num))
-
-            if cx >= R_NAME[0]:
-                if _is_point_name(text):
-                    r_names.append(_clean_point_name(text))
-
-        x_vals = _combine_split_coord(x_raw)
-        name = (r_names or l_names or [None])[0]
-
-        if name and y_vals and x_vals:
-            # סנן שורות תיקון: Y קטן מ-50 = דלתא, לא קואורדינטה
-            if y_vals[0] >= 50:
-                points.append({
-                    'שם נקודה': name,
-                    'Y': round(y_vals[0], 3),
-                    'X': round(x_vals[0], 3),
-                })
-
-    return points
-
-
-def _extract_generic(rows, img_w):
-    """
-    חילוץ גנרי — מחפש שורות עם שם נקודה + שתי קואורדינטות בחצי ימני
-    """
-    RIGHT = int(img_w * 0.52)
-    points = []
-
-    for row_y, items in rows.items():
-        names, coord_raw = [], []
-
-        for cx, cy, text, conf in items:
-            if _is_point_name(text):
-                names.append((cx, text.strip()))
-            num = _parse_number(text)
-            if num and num >= 10 and cx > RIGHT:
-                coord_raw.append((cx, num))
-
-        coord_raw.sort(key=lambda z: z[0])
-        coords = [v for _, v in coord_raw if _is_coord(v)]
-
-        if len(coords) >= 2 and names:
-            name = sorted(names, key=lambda z: z[0])[0][1]
-            if coords[0] >= 50:
-                points.append({
-                    'שם נקודה': name,
-                    'Y': round(coords[0], 3),
-                    'X': round(coords[1], 3),
-                })
-
-    return points
-
-
-def _is_matzola_page(rows) -> bool:
-    """מזהה אם העמוד הוא חשוב מצולע לפי מילות מפתח"""
-    keywords = {'sn', 'cs', 'a', 'matzola', 'מצולע'}
-    for items in rows.values():
-        for _, _, text, _ in items:
-            if text.strip().lower() in keywords:
-                return True
-    return False
-
-
-# ── שיפורי מהירות ────────────────────────────────────────────────────────────
-
-# רזולוציה מקסימלית לפני OCR — 1200px שומר על קריאות כתב יד
-MAX_WIDTH = 1200
-
-def _resize_for_ocr(img: Image.Image) -> np.ndarray:
-    """
-    מכין תמונה ל-Tesseract:
-    - גווני אפור (L mode) עם ניגודיות גבוהה
-    - רזולוציה מוגדלת ל-1400px לדיוק טוב יותר
-    """
+def _prepare(img: Image.Image) -> np.ndarray:
+    """המרה לגווני אפור + שיפור ניגודיות לטסרקט"""
     import PIL.ImageEnhance as IE
-    # 1) המרה לגווני אפור (Tesseract מעדיף)
     img = img.convert('L')
-    # 2) הגדל רזולוציה — Tesseract מדויק יותר על תמונות גדולות
     w, h = img.size
-    target = 1400
-    if w < target:
-        ratio = target / w
-        img = img.resize((target, int(h * ratio)), Image.LANCZOS)
-    # 3) שיפור ניגודיות ודגשת קווים
+    if w < 1400:
+        ratio = 1400 / w
+        img = img.resize((1400, int(h * ratio)), Image.LANCZOS)
     img = IE.Contrast(img).enhance(2.0)
     img = IE.Sharpness(img).enhance(2.0)
     return np.array(img.convert('RGB'))
 
 
-def _has_enough_text(img: Image.Image, min_density=0.03, max_density=0.6) -> bool:
-    """
-    בודק צפיפות פיקסלים שחורים בתמונה בינארית.
-    עמוד ריק / שער: צפיפות נמוכה → דלג.
-    עמוד שחור לחלוטין (שגיאה): צפיפות גבוהה → דלג.
-    """
-    arr = np.array(img.convert('L'))   # גווני אפור
+def _has_content(img: Image.Image) -> bool:
+    """בודק שהעמוד לא ריק"""
+    arr = np.array(img.convert('L'))
     black = (arr < 128).mean()
-    return min_density <= black <= max_density
+    return 0.02 <= black <= 0.7
+
+# ── OCR ──────────────────────────────────────────────────────────────────────
+
+def _ocr(img_array: np.ndarray) -> list:
+    """
+    מריץ Tesseract ומחזיר: [(cx, cy, text, conf), ...]
+    psm=11 = sparse text — הכי מתאים לטפסי מדידה
+    """
+    from PIL import Image as _PIL
+    img = _PIL.fromarray(img_array)
+    data = pytesseract.image_to_data(
+        img,
+        output_type=pytesseract.Output.DICT,
+        lang='eng',
+        config=r'--oem 1 --psm 11',
+    )
+    items = []
+    for i in range(len(data['text'])):
+        text = data['text'][i].strip()
+        conf = int(data['conf'][i])
+        if not text or conf < 15:
+            continue
+        x = data['left'][i] + data['width'][i] // 2
+        y = data['top'][i] + data['height'][i] // 2
+        items.append((x, y, text, conf / 100.0))
+    return items
+
+# ── ניקוי וזיהוי ─────────────────────────────────────────────────────────────
+
+def _best_number(text: str):
+    """
+    מחלץ את המספר הטוב ביותר מטקסט OCR רועש.
+    מחזיר float או None.
+    """
+    # נסה קודם כמספר שלם
+    t = re.sub(r'[^0-9.]', '', text)
+    try:
+        v = float(t)
+        return v if v > 0 else None
+    except ValueError:
+        pass
+    # מצא את רצף הספרות הארוך ביותר עם נקודה עשרונית
+    matches = re.findall(r'\d+\.\d+', text)
+    if matches:
+        try:
+            return float(max(matches, key=len))
+        except ValueError:
+            pass
+    # מצא רצף ספרות בלבד
+    matches = re.findall(r'\d{2,}', text)
+    if matches:
+        try:
+            return float(max(matches, key=len))
+        except ValueError:
+            pass
+    return None
 
 
-# ── עיבוד עמוד בודד ──────────────────────────────────────────────────────────
+def _is_coord(v: float) -> bool:
+    """בודק אם הערך בטווח קואורדינטה סבירה"""
+    return (50 <= v <= 10_000) or (100_000 <= v <= 900_000)
 
-def _process_page(img_array) -> list:
-    results = _run_tesseract(img_array)
-    img_w = img_array.shape[1]
-    rows = _group_rows(results)
 
-    if _is_matzola_page(rows):
-        return _extract_from_matzola(rows, img_w)
-    else:
-        return _extract_generic(rows, img_w)
+def _clean_name(text: str) -> str:
+    """מנקה שם נקודה — מסיר תווי רעש"""
+    return re.sub(r'[^0-9A-Za-z]', '', text.strip())
 
+
+def _is_name(text: str) -> bool:
+    t = _clean_name(text)
+    return bool(t and re.match(r'^[0-9]{1,5}[A-Za-z]?$', t))
+
+# ── קיבוץ לשורות ─────────────────────────────────────────────────────────────
+
+def _to_rows(items: list, tol: int = 22) -> dict:
+    """מקבץ פריטי OCR לפי שורות (y ± tol)"""
+    rows = defaultdict(list)
+    for cx, cy, text, conf in items:
+        key = round(cy / tol) * tol
+        rows[key].append((cx, cy, text, conf))
+    return {k: sorted(v) for k, v in sorted(rows.items())}
+
+# ── חילוץ קואורדינטות ────────────────────────────────────────────────────────
+
+def _extract_page(items: list, img_w: int) -> list:
+    """
+    האלגוריתם החדש:
+    לכל שורה — מחפש שני מספרים > 100 בחצי הימני של העמוד
+    ושם נקודה (שמאל או ימין).
+    מדלג על שורות תיקון (מספרים קטנים < 100).
+    """
+    rows = _to_rows(items)
+    points = []
+
+    # הגדרת אזורים (אחוזים מרוחב)
+    MID       = int(img_w * 0.55)   # גבול אמצע
+    Y_START   = int(img_w * 0.62)   # תחילת אזור Y
+    Y_END     = int(img_w * 0.83)   # סוף אזור Y
+    X_START   = int(img_w * 0.83)   # תחילת אזור X
+    X_END     = int(img_w * 1.02)   # סוף אזור X (מעט מחוץ לתמונה)
+    NAME_LEFT = int(img_w * 0.14)   # גבול שם שמאל
+    NAME_RIGHT= int(img_w * 0.93)   # תחילת שם ימין
+
+    for row_y, row_items in rows.items():
+        y_cands, x_cands, left_names, right_names = [], [], [], []
+
+        for cx, cy, text, conf in row_items:
+
+            # שמות נקודה
+            if cx <= NAME_LEFT and _is_name(text):
+                left_names.append(_clean_name(text))
+            if cx >= NAME_RIGHT and _is_name(text):
+                right_names.append(_clean_name(text))
+
+            # מספרים בחצי הימני
+            if cx < MID:
+                continue
+            num = _best_number(text)
+            if num is None:
+                continue
+
+            if Y_START <= cx < Y_END and _is_coord(num):
+                y_cands.append(num)
+            elif X_START <= cx < X_END and _is_coord(num):
+                x_cands.append(num)
+
+        name = (right_names or left_names or [None])[0]
+        if name and y_cands and x_cands:
+            y_val = y_cands[0]
+            x_val = x_cands[0]
+            # סנן שורות תיקון: Y גדול = קואורדינטה, Y קטן = דלתא
+            if y_val >= 80:
+                points.append({
+                    'שם נקודה': name,
+                    'Y': round(y_val, 3),
+                    'X': round(x_val, 3),
+                })
+
+    return points
+
+
+def _process_page(img_array: np.ndarray) -> list:
+    items = _ocr(img_array)
+    return _extract_page(items, img_array.shape[1])
 
 # ── ממשק ציבורי ───────────────────────────────────────────────────────────────
 
 def extract_from_tif(file_bytes: bytes, progress_cb=None, max_pages: int = 0) -> pd.DataFrame:
     """
-    מקבל bytes של קובץ TIF רב-עמודי,
-    מחזיר DataFrame עם עמודות: שם נקודה, Y, X
-
-    max_pages: מספר מקסימלי של עמודים לעיבוד (0 = כולם)
+    מקבל bytes של TIF רב-עמודי.
+    מחזיר DataFrame: שם נקודה, Y, X
+    max_pages=0 → כל העמודים
     """
     img = Image.open(io.BytesIO(file_bytes))
     n_pages = getattr(img, 'n_frames', 1)
@@ -293,19 +195,17 @@ def extract_from_tif(file_bytes: bytes, progress_cb=None, max_pages: int = 0) ->
     for page_num in range(n_pages):
         img.seek(page_num)
 
-        # דלג על עמודים ריקים/שערים
-        if not _has_enough_text(img):
+        if not _has_content(img):
             if progress_cb:
                 progress_cb(page_num + 1, n_pages)
             continue
 
-        arr = _resize_for_ocr(img)
+        arr = _prepare(img)
 
         try:
             pts = _process_page(arr)
             all_points.extend(pts)
         except Exception as e:
-            # המשך לעמוד הבא גם אם יש שגיאה
             print(f"Page {page_num+1} error: {e}")
 
         if progress_cb:
@@ -315,18 +215,15 @@ def extract_from_tif(file_bytes: bytes, progress_cb=None, max_pages: int = 0) ->
         return pd.DataFrame(columns=['שם נקודה', 'Y', 'X'])
 
     df = pd.DataFrame(all_points)
-    df = df.drop_duplicates(subset=['שם נקודה'])
     df['Y'] = pd.to_numeric(df['Y'], errors='coerce')
     df['X'] = pd.to_numeric(df['X'], errors='coerce')
-    df = df.dropna(subset=['Y', 'X']).reset_index(drop=True)
+    df = df.dropna(subset=['Y', 'X'])
+    df = df.drop_duplicates(subset=['שם נקודה']).reset_index(drop=True)
     return df
 
 
 def extract_from_pdf(file_bytes: bytes) -> pd.DataFrame:
-    """
-    מקבל bytes של קובץ PDF,
-    מחלץ קואורדינטות מטקסט ישיר (ללא OCR)
-    """
+    """חילוץ מ-PDF עם טקסט ישיר (ללא OCR)"""
     try:
         import pdfplumber
     except ImportError:
@@ -335,17 +232,14 @@ def extract_from_pdf(file_bytes: bytes) -> pd.DataFrame:
     all_points = []
     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
         for page in pdf.pages:
-            tables = page.extract_tables()
-            for table in tables:
+            for table in (page.extract_tables() or []):
                 for row in table:
                     if not row or len(row) < 3:
                         continue
-                    name = str(row[0]).strip() if row[0] else ''
-                    y_str = str(row[1]).strip() if row[1] else ''
-                    x_str = str(row[2]).strip() if row[2] else ''
+                    name = str(row[0] or '').strip()
                     try:
-                        y = float(y_str.replace(',', '.'))
-                        x = float(x_str.replace(',', '.'))
+                        y = float(str(row[1]).replace(',', '.'))
+                        x = float(str(row[2]).replace(',', '.'))
                         if _is_coord(y) and _is_coord(x) and name:
                             all_points.append({'שם נקודה': name, 'Y': y, 'X': x})
                     except ValueError:
@@ -353,6 +247,4 @@ def extract_from_pdf(file_bytes: bytes) -> pd.DataFrame:
 
     if not all_points:
         return pd.DataFrame(columns=['שם נקודה', 'Y', 'X'])
-
-    df = pd.DataFrame(all_points).drop_duplicates(subset=['שם נקודה'])
-    return df.reset_index(drop=True)
+    return pd.DataFrame(all_points).drop_duplicates(subset=['שם נקודה']).reset_index(drop=True)
