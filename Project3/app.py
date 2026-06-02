@@ -89,11 +89,17 @@ def load_csv(path_or_bytes, is_bytes=False):
 def get_datasets():
     result = {}
     for i in ["1", "2", "3", "4"]:
+        folder_path = os.path.join(ROOT_DIR, "DATA", i)
         for ext in [".CSV", ".csv"]:
-            p = os.path.join(ROOT_DIR, f"coordinates_{i}{ext}")
+            p = os.path.join(folder_path, f"coordinates_{i}{ext}")
             if os.path.exists(p):
                 result[i] = p
                 break
+        if i not in result:
+            files = glob.glob(os.path.join(folder_path, "*.csv")) + \
+                    glob.glob(os.path.join(folder_path, "*.CSV"))
+            if files:
+                result[i] = files[0]
     return result
 
 
