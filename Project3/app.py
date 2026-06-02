@@ -204,11 +204,11 @@ def show_anomaly_results(df_res):
 # לשוניות
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_home, tab_detect, tab_eda, tab_ocr = st.tabs([
+tab_ocr, tab_detect, tab_eda, tab_home = st.tabs([
+    "📄 שלב 1 — חילוץ מ-TIF/PDF",
+    "🤖 שלב 2 — זיהוי חריגים",
+    "📊 שלב 3 — EDA",
     "🏠 ראשי",
-    "🤖 זיהוי חריגים",
-    "📊 EDA",
-    "📄 חילוץ מ-TIF/PDF",
 ])
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -285,10 +285,18 @@ with tab_detect:
         st.error("❌ מודל לא נמצא — הריצי את trainmodel.py")
         st.stop()
 
+    # הודעה אם יש נתונים מחולצים
+    has_ocr = "ocr_df" in st.session_state and st.session_state["ocr_df"] is not None
+    if has_ocr:
+        n_ocr = len(st.session_state["ocr_df"])
+        st.success(f"✅ נמצאו נתונים מחולצים מ-TIF — **{n_ocr} נקודות** מוכנות לניתוח!")
+    else:
+        st.info("💡 חלצי קואורדינטות מ-TIF בשלב 1 — הן יופיעו כאן אוטומטית")
+
     # מקור נתונים
     source_opts = ["מערך נתונים קיים", "העלאת קובץ CSV"]
-    if "ocr_df" in st.session_state and st.session_state["ocr_df"] is not None:
-        source_opts.insert(0, "נתונים שחולצו (OCR)")
+    if has_ocr:
+        source_opts.insert(0, "נתונים שחולצו מ-TIF ✅")
 
     col_src, col_mod = st.columns(2)
     with col_src:
@@ -299,7 +307,7 @@ with tab_detect:
 
     df_input = None
 
-    if source == "נתונים שחולצו (OCR)":
+    if source == "נתונים שחולצו מ-TIF ✅":
         df_input = st.session_state["ocr_df"]
         st.info(f"נטענו {len(df_input)} נקודות מחילוץ OCR")
 
