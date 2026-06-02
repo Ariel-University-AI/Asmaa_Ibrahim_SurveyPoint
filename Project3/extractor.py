@@ -503,7 +503,13 @@ def extract_with_gemini(
     from google import genai
     import json, time
 
-    client = genai.Client(api_key=api_key)
+    # נסה ל-v1alpha שתומך ביותר מודלים
+    from google.genai import types as _t
+    client = genai.Client(
+        api_key=api_key,
+        http_options={'api_version': 'v1alpha'},
+    )
+    GEMINI_MODEL = "gemini-2.0-flash-exp"
 
     PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך.
 חלץ את כל הקואורדינטות מהטבלה.
@@ -536,7 +542,7 @@ def extract_with_gemini(
         try:
             from google.genai import types as gtypes
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model=GEMINI_MODEL,
                 contents=[
                     gtypes.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
                     PROMPT,
