@@ -74,85 +74,116 @@ def _group_rows(results, row_tol=18):
     return {k: sorted(v, key=lambda x: x[0]) for k, v in sorted(rows.items())}
 
 
+def _combine_split_coord(raw_pairs: list):
+    """
+    מאחד מספרים שפוצלו ע"י OCR: (339, 23) → 339.23
+    raw_pairs: רשימת (x_pos, value) ממוינת לפי x
+    """
+    if not raw_pairs:
+        return []
+    raw_pairs = sorted(raw_pairs, key=lambda z: z[0])
+
+    # מספר יחיד גדול — החזר אותו
+    large = [v for _, v in raw_pairs if _is_coord(v)]
+    if len(large) == 1:
+        return large
+
+    # שני מספרים סמוכים — נסה לחבר כ-integer.decimal
+    if len(raw_pairs) >= 2:
+        (x1, v1), (x2, v2) = raw_pairs[0], raw_pairs[1]
+        if x2 - x1 < 160 and v1 >= 50:
+            try:
+                combined = float(f"{int(v1)}.{int(v2)}")
+                if _is_coord(combined):
+                    return [combined]
+            except Exception:
+                pass
+
+    return large or [v for _, v in raw_pairs if v >= 10]
+
+
 def _extract_from_matzola(rows, img_w):
     """
-    חשוב מצולע — מבנה העמוד (שמאל לימין):
-      שם_נקודה | זווית | אזימוט | אורך | sn/cs | Y | X | שם_נקודה
-    אזורי עמודות (אחוז מרוחב):
-      שם שמאל  : 0–13%
-      Y         : 67–83%
-      X         : 83–97%
-      שם ימין  : 97–100%
+    חשוב מצולע — עמודות (שמאל→ימין):
+      שם | זווית | אזימוט | אורך | sn/cs | Y | X | שם
+    אחוזים (מורחבים מעט):
+      שם שמאל : 0–15%
+      Y        : 63–82%
+      X        : 82–99%
+      שם ימין : 94–110%  (+ שוליים לחריגות OCR)
     """
-    L_NAME = (0,          int(img_w * 0.13))
-    Y_ZONE  = (int(img_w * 0.67), int(img_w * 0.83))
-    X_ZONE  = (int(img_w * 0.83), int(img_w * 0.97))
-    R_NAME  = (int(img_w * 0.97), img_w)
+    L_NAME = (0,             int(img_w * 0.15))
+    Y_ZONE = (int(img_w * 0.63), int(img_w * 0.82))
+    X_ZONE = (int(img_w * 0.82), int(img_w * 0.99))
+    R_NAME = (int(img_w * 0.94), img_w + 60)   # +60 לשוליות OCR
 
     points = []
 
     for row_y, items in rows.items():
-        y_vals, x_vals, l_names, r_names = [], [], [], []
+        y_vals, x_raw, l_names, r_names = [], [], [], []
 
         for cx, cy, text, conf in items:
             num = _parse_number(text)
 
-            if L_NAME[0] <= cx < L_NAME[1]:
+            if cx < L_NAME[1]:
                 if _is_point_name(text):
                     l_names.append(text.strip())
 
-            elif Y_ZONE[0] <= cx < Y_ZONE[1]:
+            if Y_ZONE[0] <= cx < Y_ZONE[1]:
                 if num and _is_coord(num):
                     y_vals.append(num)
 
-            elif X_ZONE[0] <= cx < X_ZONE[1]:
-                if num and _is_coord(num):
-                    x_vals.append(num)
-                # מספר שפוצל לשניים — ניסיון לחיבור
-                elif num and 10 <= num < 1000:
-                    x_vals.append(num)
+            if X_ZONE[0] <= cx < X_ZONE[1]:
+                if num is not None and num >= 10:
+                    x_raw.append((cx, num))
 
-            elif R_NAME[0] <= cx < R_NAME[1]:
+            if cx >= R_NAME[0]:
                 if _is_point_name(text):
                     r_names.append(text.strip())
 
+        x_vals = _combine_split_coord(x_raw)
         name = (r_names or l_names or [None])[0]
+
         if name and y_vals and x_vals:
-            points.append({
-                'שם נקודה': name,
-                'Y': round(y_vals[0], 3),
-                'X': round(x_vals[0], 3),
-            })
+            # סנן שורות תיקון: Y קטן מ-50 = דלתא, לא קואורדינטה
+            if y_vals[0] >= 50:
+                points.append({
+                    'שם נקודה': name,
+                    'Y': round(y_vals[0], 3),
+                    'X': round(x_vals[0], 3),
+                })
 
     return points
 
 
 def _extract_generic(rows, img_w):
     """
-    חילוץ גנרי לעמודים שאינם מצולע:
-    מחפש שורות עם: שם_נקודה + שני מספרים גדולים (קואורדינטות)
+    חילוץ גנרי — מחפש שורות עם שם נקודה + שתי קואורדינטות בחצי ימני
     """
-    RIGHT_HALF = int(img_w * 0.55)
+    RIGHT = int(img_w * 0.52)
     points = []
 
     for row_y, items in rows.items():
-        names, coords = [], []
+        names, coord_raw = [], []
 
         for cx, cy, text, conf in items:
             if _is_point_name(text):
                 names.append((cx, text.strip()))
             num = _parse_number(text)
-            if num and _is_coord(num) and cx > RIGHT_HALF:
-                coords.append((cx, num))
+            if num and num >= 10 and cx > RIGHT:
+                coord_raw.append((cx, num))
 
-        coords.sort(key=lambda z: z[0])
+        coord_raw.sort(key=lambda z: z[0])
+        coords = [v for _, v in coord_raw if _is_coord(v)]
+
         if len(coords) >= 2 and names:
             name = sorted(names, key=lambda z: z[0])[0][1]
-            points.append({
-                'שם נקודה': name,
-                'Y': round(coords[0][1], 3),
-                'X': round(coords[1][1], 3),
-            })
+            if coords[0] >= 50:
+                points.append({
+                    'שם נקודה': name,
+                    'Y': round(coords[0], 3),
+                    'X': round(coords[1], 3),
+                })
 
     return points
 
@@ -169,8 +200,8 @@ def _is_matzola_page(rows) -> bool:
 
 # ── שיפורי מהירות ────────────────────────────────────────────────────────────
 
-# רזולוציה מקסימלית לפני OCR — מקטין זמן עיבוד ב-~75%
-MAX_WIDTH = 900
+# רזולוציה מקסימלית לפני OCR — 1200px שומר על קריאות כתב יד
+MAX_WIDTH = 1200
 
 def _resize_for_ocr(img: Image.Image) -> np.ndarray:
     """מקטין תמונה אם רחבה מדי, שומר יחס גובה-רוחב"""
@@ -178,6 +209,10 @@ def _resize_for_ocr(img: Image.Image) -> np.ndarray:
     if w > MAX_WIDTH:
         ratio = MAX_WIDTH / w
         img = img.resize((MAX_WIDTH, int(h * ratio)), Image.LANCZOS)
+    # שיפור ניגודיות לכתב יד סרוק
+    import PIL.ImageEnhance as IE
+    img = IE.Contrast(img).enhance(1.5)
+    img = IE.Sharpness(img).enhance(1.3)
     return np.array(img.convert('RGB'))
 
 
