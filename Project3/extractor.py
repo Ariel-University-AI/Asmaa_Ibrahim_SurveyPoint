@@ -528,19 +528,22 @@ def extract_with_gemini(
             if progress_cb: progress_cb(n_pages - page_num, n_pages)
             continue
 
-        # המר לRGB ושמור כ-JPEG בזיכרון
-        page_img = img.convert('RGB')
+        # המר לJPEG bytes
         buf = io.BytesIO()
-        page_img.save(buf, format='JPEG', quality=90)
-        buf.seek(0)
-        pil_page = Image.open(buf)
+        img.convert('RGB').save(buf, format='JPEG', quality=90)
+        img_bytes = buf.getvalue()
 
         try:
+            from google.genai import types as gtypes
             response = client.models.generate_content(
                 model="gemini-2.0-flash",
-                contents=[pil_page, PROMPT],
+                contents=[
+                    gtypes.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+                    PROMPT,
+                ],
             )
             text = response.text.strip()
+            print(f"Page {page_num+1}: Gemini responded {len(text)} chars")
             # נקה markdown אם יש
             text = re.sub(r'^```json\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
@@ -558,7 +561,9 @@ def extract_with_gemini(
                     continue
 
         except Exception as e:
+            import traceback
             print(f"Page {page_num+1} Gemini error: {e}")
+            traceback.print_exc()
 
         # Gemini: 15 בקשות/דקה → המתן מעט
         time.sleep(4)
