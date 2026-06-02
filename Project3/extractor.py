@@ -500,11 +500,10 @@ def extract_with_gemini(
     חילוץ קואורדינטות באמצעות Gemini Vision — דיוק גבוה על כתב יד.
     מודל: gemini-1.5-flash (חינם, 15 בקשות/דקה)
     """
-    import google.generativeai as genai
+    from google import genai
     import json, time
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    client = genai.Client(api_key=api_key)
 
     PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך.
 חלץ את כל הקואורדינטות מהטבלה.
@@ -537,9 +536,9 @@ def extract_with_gemini(
         pil_page = Image.open(buf)
 
         try:
-            response = model.generate_content(
-                [pil_page, PROMPT],
-                generation_config={"temperature": 0}
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=[pil_page, PROMPT],
             )
             text = response.text.strip()
             # נקה markdown אם יש
