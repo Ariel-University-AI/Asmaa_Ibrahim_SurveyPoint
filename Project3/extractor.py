@@ -513,13 +513,16 @@ def extract_with_gemini(
         f"https://generativelanguage.googleapis.com/v1beta/models{QP}",
         headers=HDR, timeout=10)
     lst.raise_for_status()
+    # העדף gemini-2.0-flash (יציב יותר מ-2.5)
     models_avail = [
         m['name'].split('/')[-1]
         for m in lst.json().get('models', [])
         if 'generateContent' in m.get('supportedGenerationMethods', [])
         and 'flash' in m['name']
     ]
-    GEMINI_MODEL = models_avail[0] if models_avail else "gemini-2.0-flash"
+    # בחר 2.0 אם קיים, אחרת את הראשון
+    preferred = [m for m in models_avail if '2.0-flash' in m and 'lite' not in m]
+    GEMINI_MODEL = preferred[0] if preferred else (models_avail[0] if models_avail else "gemini-2.0-flash")
     print(f"Using model: {GEMINI_MODEL}")
 
     API_URL = (f"https://generativelanguage.googleapis.com/v1beta/models/"
