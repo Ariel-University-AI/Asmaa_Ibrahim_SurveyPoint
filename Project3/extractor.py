@@ -504,7 +504,29 @@ def extract_with_gemini(
     import json, time
 
     genai_old.configure(api_key=api_key)
-    model = genai_old.GenerativeModel('gemini-1.5-flash')
+
+    # נסה מודלים שונים עד שמוצאים אחד שעובד
+    CANDIDATES = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro-latest',
+        'gemini-pro-vision',
+        'gemini-1.0-pro-vision',
+    ]
+    model = None
+    working_model = None
+    for candidate in CANDIDATES:
+        try:
+            m = genai_old.GenerativeModel(candidate)
+            m.generate_content("test")
+            model = m
+            working_model = candidate
+            print(f"Using Gemini model: {candidate}")
+            break
+        except Exception:
+            continue
+    if model is None:
+        raise RuntimeError("לא נמצא מודל Gemini זמין. בדקי שה-API Key תקין.")
 
     PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך.
 חלץ את כל הקואורדינטות מהטבלה.

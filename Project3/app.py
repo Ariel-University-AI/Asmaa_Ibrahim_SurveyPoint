@@ -431,8 +431,18 @@ with tab_ocr:
                     from google import genai as _genai
                     import google.generativeai as _g
                     _g.configure(api_key=gemini_key)
-                    _m = _g.GenerativeModel('gemini-1.5-flash')
-                    _r = _m.generate_content("Say OK in one word")
+                    # נסה מודלים עד שמוצאים אחד שעובד
+                    _models = ['gemini-1.5-flash','gemini-1.5-flash-latest',
+                               'gemini-pro','gemini-1.0-pro']
+                    _r = None
+                    for _mn in _models:
+                        try:
+                            _r = _g.GenerativeModel(_mn).generate_content("Say OK")
+                            break
+                        except Exception:
+                            continue
+                    if _r is None:
+                        raise RuntimeError("לא נמצא מודל")
                     st.success(f"✅ Gemini מחובר! תשובה: {_r.text.strip()[:20]}")
                 except Exception as _e:
                     st.error(f"❌ שגיאה: {_e}")
