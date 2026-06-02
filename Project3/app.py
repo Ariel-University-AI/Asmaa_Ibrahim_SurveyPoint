@@ -226,7 +226,38 @@ with tab_extract:
         file_bytes = uploaded.read()
         fname = uploaded.name.lower()
 
-        st.info(f"📂 קובץ: **{uploaded.name}** | גודל: {len(file_bytes)//1024} KB")
+        # ספור עמודים
+        if not fname.endswith(".pdf"):
+            from PIL import Image
+            import io as _io
+            _img = Image.open(_io.BytesIO(file_bytes))
+            total_pages = getattr(_img, 'n_frames', 1)
+        else:
+            total_pages = 0
+
+        st.info(f"📂 קובץ: **{uploaded.name}** | גודל: {len(file_bytes)//1024} KB"
+                + (f" | {total_pages} עמודים" if total_pages else ""))
+
+        # בוחר מספר עמודים
+        if total_pages > 1:
+            col_sl, col_info = st.columns([3, 2])
+            with col_sl:
+                max_pages = st.slider(
+                    "כמה עמודים לעבד?",
+                    min_value=1, max_value=total_pages, value=min(5, total_pages),
+                    help="פחות עמודים = מהיר יותר"
+                )
+            with col_info:
+                est_min = round(max_pages * 60 / 60, 0)
+                st.markdown(f"""
+                <div style="background:rgba(0,180,216,0.1);border:1px solid #00b4d8;
+                border-radius:10px;padding:12px;margin-top:8px;text-align:center">
+                <div style="color:#FFD700;font-size:1.4rem;font-weight:700">{max_pages} עמודים</div>
+                <div style="color:#90e0ef">~{int(est_min)} דקות</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            max_pages = 0
 
         if st.button("🚀 התחל חילוץ קואורדינטות", type="primary"):
             from extractor import extract_from_tif, extract_from_pdf
@@ -244,7 +275,11 @@ with tab_extract:
                     if fname.endswith(".pdf"):
                         df_extracted = extract_from_pdf(file_bytes)
                     else:
-                        df_extracted = extract_from_tif(file_bytes, progress_cb=update_progress)
+                        df_extracted = extract_from_tif(
+                            file_bytes,
+                            progress_cb=update_progress,
+                            max_pages=max_pages,
+                        )
 
                     progress_bar.progress(100)
                     status_text.empty()

@@ -264,29 +264,29 @@ def _process_page(img_array) -> list:
 
 # ── ממשק ציבורי ───────────────────────────────────────────────────────────────
 
-def extract_from_tif(file_bytes: bytes, progress_cb=None) -> pd.DataFrame:
+def extract_from_tif(file_bytes: bytes, progress_cb=None, max_pages: int = 0) -> pd.DataFrame:
     """
     מקבל bytes של קובץ TIF רב-עמודי,
     מחזיר DataFrame עם עמודות: שם נקודה, Y, X
-    שיפורי מהירות: דילוג עמודים ריקים + הקטנת רזולוציה
+
+    max_pages: מספר מקסימלי של עמודים לעיבוד (0 = כולם)
     """
     img = Image.open(io.BytesIO(file_bytes))
     n_pages = getattr(img, 'n_frames', 1)
+    if max_pages and max_pages < n_pages:
+        n_pages = max_pages
 
     all_points = []
-    skipped = 0
 
     for page_num in range(n_pages):
         img.seek(page_num)
 
-        # שיפור 1 — דלג על עמודים ריקים/שערים
+        # דלג על עמודים ריקים/שערים
         if not _has_enough_text(img):
-            skipped += 1
             if progress_cb:
                 progress_cb(page_num + 1, n_pages)
             continue
 
-        # שיפור 2 — הקטן רזולוציה לפני OCR
         arr = _resize_for_ocr(img)
 
         try:
