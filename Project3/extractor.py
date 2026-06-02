@@ -9,15 +9,33 @@ import pandas as pd
 from PIL import Image
 from collections import defaultdict
 
-_reader = None
+import pytesseract
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 
-def _get_reader():
-    global _reader
-    if _reader is None:
-        import easyocr
-        _reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-    return _reader
+def _run_tesseract(img_array) -> list:
+    """
+    מריץ Tesseract OCR ומחזיר פורמט אחיד: [(bbox, text, conf), ...]
+    מהיר × 20 לעומת EasyOCR
+    psm=11 = sparse text, מתאים לטפסים עם מספרים מפוזרים
+    """
+    from PIL import Image as _PIL
+    img = _PIL.fromarray(img_array)
+    config = r'--oem 1 --psm 11'
+    data = pytesseract.image_to_data(
+        img, output_type=pytesseract.Output.DICT,
+        lang='eng', config=config,
+    )
+    results = []
+    for i in range(len(data['text'])):
+        text = data['text'][i].strip()
+        conf = int(data['conf'][i])
+        if not text or conf < 20:
+            continue
+        x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
+        bbox = [[x, y], [x+w, y], [x+w, y+h], [x, y+h]]
+        results.append((bbox, text, conf / 100.0))
+    return results
 
 
 # ── ניקוי טקסט OCR ──────────────────────────────────────────────────────────
@@ -54,9 +72,17 @@ def _is_coord(val: float) -> bool:
 
 
 def _is_point_name(text: str) -> bool:
-    """בודק אם הטקסט מכיל שם נקודה (מספר עם אות אופציונלית)"""
-    t = text.strip()
+    """בודק אם הטקסט מכיל שם נקודה — נקה תווי רעש מ-Tesseract"""
+    # הסר תווי רעש נפוצים
+    t = re.sub(r'[^0-9A-Za-z]', '', text.strip())
+    if not t:
+        return False
     return bool(re.match(r'^[0-9]{1,5}[A-Za-z]?$', t) or re.match(r'^[A-Z]$', t))
+
+
+def _clean_point_name(text: str) -> str:
+    """מחזיר שם נקודה נקי"""
+    return re.sub(r'[^0-9A-Za-z]', '', text.strip())
 
 
 # ── ניתוח עמוד OCR ───────────────────────────────────────────────────────────
@@ -127,7 +153,7 @@ def _extract_from_matzola(rows, img_w):
 
             if cx < L_NAME[1]:
                 if _is_point_name(text):
-                    l_names.append(text.strip())
+                    l_names.append(_clean_point_name(text))
 
             if Y_ZONE[0] <= cx < Y_ZONE[1]:
                 if num and _is_coord(num):
@@ -139,7 +165,7 @@ def _extract_from_matzola(rows, img_w):
 
             if cx >= R_NAME[0]:
                 if _is_point_name(text):
-                    r_names.append(text.strip())
+                    r_names.append(_clean_point_name(text))
 
         x_vals = _combine_split_coord(x_raw)
         name = (r_names or l_names or [None])[0]
@@ -204,18 +230,24 @@ def _is_matzola_page(rows) -> bool:
 MAX_WIDTH = 1200
 
 def _resize_for_ocr(img: Image.Image) -> np.ndarray:
-    """מקטין תמונה אם רחבה מדי ומשפר ניגודיות"""
+    """
+    מכין תמונה ל-Tesseract:
+    - גווני אפור (L mode) עם ניגודיות גבוהה
+    - רזולוציה מוגדלת ל-1400px לדיוק טוב יותר
+    """
     import PIL.ImageEnhance as IE
-    # המרה ל-RGB לפני כל עיבוד (TIF בינארי הוא mode='1')
-    img = img.convert('RGB')
+    # 1) המרה לגווני אפור (Tesseract מעדיף)
+    img = img.convert('L')
+    # 2) הגדל רזולוציה — Tesseract מדויק יותר על תמונות גדולות
     w, h = img.size
-    if w > MAX_WIDTH:
-        ratio = MAX_WIDTH / w
-        img = img.resize((MAX_WIDTH, int(h * ratio)), Image.LANCZOS)
-    # שיפור ניגודיות לכתב יד סרוק
-    img = IE.Contrast(img).enhance(1.5)
-    img = IE.Sharpness(img).enhance(1.3)
-    return np.array(img)
+    target = 1400
+    if w < target:
+        ratio = target / w
+        img = img.resize((target, int(h * ratio)), Image.LANCZOS)
+    # 3) שיפור ניגודיות ודגשת קווים
+    img = IE.Contrast(img).enhance(2.0)
+    img = IE.Sharpness(img).enhance(2.0)
+    return np.array(img.convert('RGB'))
 
 
 def _has_enough_text(img: Image.Image, min_density=0.03, max_density=0.6) -> bool:
@@ -232,8 +264,7 @@ def _has_enough_text(img: Image.Image, min_density=0.03, max_density=0.6) -> boo
 # ── עיבוד עמוד בודד ──────────────────────────────────────────────────────────
 
 def _process_page(img_array) -> list:
-    reader = _get_reader()
-    results = reader.readtext(img_array, detail=1)
+    results = _run_tesseract(img_array)
     img_w = img_array.shape[1]
     rows = _group_rows(results)
 
