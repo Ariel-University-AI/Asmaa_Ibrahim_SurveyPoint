@@ -429,14 +429,10 @@ with tab_ocr:
             if st.button("🔗 בדוק חיבור", key="test_gemini"):
                 try:
                     from google import genai as _genai
-                    _c = _genai.Client(
-                        api_key=gemini_key,
-                        http_options={'api_version': 'v1alpha'},
-                    )
-                    _r = _c.models.generate_content(
-                        model="gemini-2.0-flash-exp",
-                        contents=["Say OK in one word"]
-                    )
+                    import google.generativeai as _g
+                    _g.configure(api_key=gemini_key)
+                    _m = _g.GenerativeModel('gemini-1.5-flash')
+                    _r = _m.generate_content("Say OK in one word")
                     st.success(f"✅ Gemini מחובר! תשובה: {_r.text.strip()[:20]}")
                 except Exception as _e:
                     st.error(f"❌ שגיאה: {_e}")
