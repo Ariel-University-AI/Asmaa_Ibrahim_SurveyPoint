@@ -437,19 +437,28 @@ with tab_ocr:
     st.divider()
 
     # ── קבצים ──────────────────────────────────────────────────────────────
-    col_tif, col_csv = st.columns(2)
-    with col_tif:
+    # העלאת TIF — תמיד. CSV — רק בלי Gemini
+    if gemini_key:
         uploaded = st.file_uploader(
             "📄 קובץ TIF או PDF (תיק חישובים)",
             type=["tif", "TIF", "tiff", "TIFF", "pdf", "PDF"],
             key="ocr_upload",
         )
-    with col_csv:
-        ref_csv = st.file_uploader(
-            "📊 קובץ CSV לאימות (אופציונלי)",
-            type=["csv", "CSV"],
-            key="ref_csv",
-        )
+        ref_csv = None
+    else:
+        col_tif, col_csv = st.columns(2)
+        with col_tif:
+            uploaded = st.file_uploader(
+                "📄 קובץ TIF או PDF (תיק חישובים)",
+                type=["tif", "TIF", "tiff", "TIFF", "pdf", "PDF"],
+                key="ocr_upload",
+            )
+        with col_csv:
+            ref_csv = st.file_uploader(
+                "📊 קובץ CSV לאימות (אופציונלי)",
+                type=["csv", "CSV"],
+                key="ref_csv",
+            )
 
     if uploaded is not None:
         file_bytes = uploaded.read()
@@ -468,9 +477,9 @@ with tab_ocr:
         st.info(f"📂 **{uploaded.name}** | {len(file_bytes)//1024} KB"
                 + (f" | **{total_pages} עמודים**" if total_pages > 1 else ""))
 
-        # בוחר עמודים
+        # בוחר עמודים — רק בלי Gemini
         max_pages = total_pages
-        if total_pages > 1:
+        if total_pages > 1 and not gemini_key:
             col_sl, col_est = st.columns([3, 2])
             with col_sl:
                 max_pages = st.slider("כמה עמודים לעבד?",
