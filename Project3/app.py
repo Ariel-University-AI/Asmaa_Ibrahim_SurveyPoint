@@ -454,6 +454,25 @@ with tab_ocr:
                     _r = type('R', (), {'text': _res.json()
                            ['candidates'][0]['content']['parts'][0]['text']})()
                     st.success(f"✅ Gemini מחובר! תשובה: {_r.text.strip()[:20]}")
+                    # בדוק עמוד 3 עם תמונה
+                    import base64, io as _io
+                    from PIL import Image as _PIL
+                    _tif_path = os.path.join(ROOT_DIR, "DATA", "1", "Data1.TIF")
+                    if os.path.exists(_tif_path):
+                        _timg = _PIL.open(_tif_path)
+                        _timg.seek(2)
+                        _tbuf = _io.BytesIO()
+                        _timg.convert('RGB').save(_tbuf, format='JPEG', quality=85)
+                        _tb64 = base64.b64encode(_tbuf.getvalue()).decode()
+                        _tp = {"contents": [{"parts": [
+                            {"inline_data": {"mime_type": "image/jpeg", "data": _tb64}},
+                            {"text": "List all coordinates (name, Y, X) as JSON array. Return [] if none."}
+                        ]}]}
+                        _tr = _req.post(_url, headers=_hdr, json=_tp, timeout=30)
+                        _tr.raise_for_status()
+                        _raw = _tr.json()['candidates'][0]['content']['parts'][0]['text']
+                        st.markdown("**תשובת Gemini לעמוד 3:**")
+                        st.code(_raw[:500])
                 except Exception as _e:
                     st.error(f"❌ שגיאה: {_e}")
             else:

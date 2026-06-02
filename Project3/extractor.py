@@ -524,8 +524,9 @@ def extract_with_gemini(
     img = Image.open(io.BytesIO(tif_bytes))
     n_pages = getattr(img, 'n_frames', 1)
     all_points = []
+    debug_log = []   # ← אוסף מה Gemini מחזיר
 
-    for page_num in range(n_pages - 1, -1, -1):  # מהאחרון לראשון
+    for page_num in range(n_pages - 1, -1, -1):
         img.seek(page_num)
         if not _has_content(img):
             if progress_cb: progress_cb(n_pages - page_num, n_pages)
@@ -545,7 +546,8 @@ def extract_with_gemini(
             resp = requests.post(API_URL, json=payload, headers=API_HDR, timeout=60)
             resp.raise_for_status()
             text = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-            print(f"Page {page_num+1}: Gemini OK, {len(text)} chars")
+            debug_log.append(f"P{page_num+1}: {text[:120]}")
+            print(f"Page {page_num+1}: {text[:80]}")
             # נקה markdown אם יש
             text = re.sub(r'^```json\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
