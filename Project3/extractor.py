@@ -560,7 +560,7 @@ def extract_with_gemini(
                 {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
                 {"text": PROMPT}
             ]}]}
-            resp = requests.post(API_URL, json=payload, headers=API_HDR, timeout=60)
+            resp = requests.post(API_URL, json=payload, headers=HDR, timeout=60)
             resp.raise_for_status()
             text = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
             debug_log.append(f"P{page_num+1}: {text[:120]}")
