@@ -430,12 +430,23 @@ with tab_ocr:
                 try:
                     from google import genai as _genai
                     import requests as _req
-                    _base = ("https://generativelanguage.googleapis.com"
-                             "/v1beta/models/gemini-1.5-flash:generateContent")
-                    if gemini_key.startswith("AIzaSy"):
-                        _url, _hdr = f"{_base}?key={gemini_key}", {}
-                    else:
-                        _url, _hdr = _base, {"x-goog-api-key": gemini_key}
+                    _hdr = ({"x-goog-api-key": gemini_key}
+                            if not gemini_key.startswith("AIzaSy")
+                            else {})
+                    _qp  = (f"?key={gemini_key}"
+                            if gemini_key.startswith("AIzaSy") else "")
+                    # רשום מודלים זמינים
+                    _list = _req.get(
+                        f"https://generativelanguage.googleapis.com/v1beta/models{_qp}",
+                        headers=_hdr, timeout=10)
+                    _list.raise_for_status()
+                    _names = [m['name'] for m in _list.json().get('models', [])
+                              if 'generateContent' in m.get('supportedGenerationMethods', [])]
+                    st.info(f"מודלים זמינים: {', '.join(_names[:5])}")
+                    # נסה את הראשון
+                    _model = _names[0].split('/')[-1] if _names else 'gemini-pro'
+                    _url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+                            f"{_model}:generateContent{_qp}")
                     _res = _req.post(_url, headers=_hdr,
                            json={"contents": [{"parts": [{"text": "Say OK"}]}]},
                            timeout=15)
