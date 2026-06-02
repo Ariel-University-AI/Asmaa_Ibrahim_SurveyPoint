@@ -204,16 +204,18 @@ def _is_matzola_page(rows) -> bool:
 MAX_WIDTH = 1200
 
 def _resize_for_ocr(img: Image.Image) -> np.ndarray:
-    """מקטין תמונה אם רחבה מדי, שומר יחס גובה-רוחב"""
+    """מקטין תמונה אם רחבה מדי ומשפר ניגודיות"""
+    import PIL.ImageEnhance as IE
+    # המרה ל-RGB לפני כל עיבוד (TIF בינארי הוא mode='1')
+    img = img.convert('RGB')
     w, h = img.size
     if w > MAX_WIDTH:
         ratio = MAX_WIDTH / w
         img = img.resize((MAX_WIDTH, int(h * ratio)), Image.LANCZOS)
     # שיפור ניגודיות לכתב יד סרוק
-    import PIL.ImageEnhance as IE
     img = IE.Contrast(img).enhance(1.5)
     img = IE.Sharpness(img).enhance(1.3)
-    return np.array(img.convert('RGB'))
+    return np.array(img)
 
 
 def _has_enough_text(img: Image.Image, min_density=0.03, max_density=0.6) -> bool:
