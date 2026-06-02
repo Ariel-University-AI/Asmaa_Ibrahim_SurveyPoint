@@ -502,11 +502,28 @@ def extract_with_gemini(
     """
     import requests, base64, json, time
 
-    BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+    # הגדר Header לפי פורמט Key
     if api_key.startswith("AIzaSy"):
-        API_URL, API_HDR = f"{BASE_URL}?key={api_key}", {}
+        HDR, QP = {}, f"?key={api_key}"
     else:
-        API_URL, API_HDR = BASE_URL, {"x-goog-api-key": api_key}
+        HDR, QP = {"x-goog-api-key": api_key}, ""
+
+    # מצא מודל זמין אוטומטית
+    lst = requests.get(
+        f"https://generativelanguage.googleapis.com/v1beta/models{QP}",
+        headers=HDR, timeout=10)
+    lst.raise_for_status()
+    models_avail = [
+        m['name'].split('/')[-1]
+        for m in lst.json().get('models', [])
+        if 'generateContent' in m.get('supportedGenerationMethods', [])
+        and 'flash' in m['name']
+    ]
+    GEMINI_MODEL = models_avail[0] if models_avail else "gemini-2.0-flash"
+    print(f"Using model: {GEMINI_MODEL}")
+
+    API_URL = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+               f"{GEMINI_MODEL}:generateContent{QP}")
 
     PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך.
 חלץ את כל הקואורדינטות מהטבלה.
