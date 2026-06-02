@@ -491,7 +491,25 @@ with tab_ocr:
                 prog.progress(int(done / total * 100))
                 stat.text(f"מעבד עמוד {done} מתוך {total}...")
 
-            mode = "🎓 מצב לימוד (CSV + OCR)" if ref_df is not None else "🔍 OCR בלבד"
+            # בחירת מנוע OCR
+            use_combined = st.checkbox(
+                "🔀 מצב משולב — Tesseract + EasyOCR (דיוק גבוה יותר, לוקח יותר זמן)",
+                value=False, key="combined_mode"
+            )
+            if use_combined:
+                est_min = round(max_pages * 62 / 60, 1)
+                st.info(f"⏱️ זמן משוער: ~{est_min} דקות (Tesseract + EasyOCR)")
+            else:
+                est_min = round(max_pages * 2.5 / 60, 1)
+                st.info(f"⏱️ זמן משוער: ~{est_min} דקות (Tesseract בלבד)")
+
+            if ref_df is not None:
+                mode = "🎓 מצב לימוד (CSV + OCR)"
+            elif use_combined:
+                mode = "🔀 Tesseract + EasyOCR"
+            else:
+                mode = "🔍 Tesseract בלבד"
+
             with st.spinner(f"מריץ חילוץ — {mode}..."):
                 try:
                     if fname.endswith(".pdf"):
@@ -502,6 +520,7 @@ with tab_ocr:
                             progress_cb=cb,
                             max_pages=max_pages,
                             reference_df=ref_df,
+                            use_combined=use_combined,
                         )
                     prog.progress(100)
                     stat.empty()

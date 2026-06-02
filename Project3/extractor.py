@@ -81,6 +81,42 @@ def _ocr_strip(pil_img, psm=11, extra='') -> list:
         out.append((cx, cy, t, c / 100.0))
     return out
 
+def _ocr_easyocr(arr: np.ndarray) -> list:
+    """EasyOCR — פורמט אחיד [(cx, cy, text, conf)]"""
+    try:
+        import easyocr
+        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        results = reader.readtext(arr, detail=1)
+        out = []
+        for bbox, text, conf in results:
+            if conf < 0.2: continue
+            cx = int(sum(p[0] for p in bbox) / 4)
+            cy = int(sum(p[1] for p in bbox) / 4)
+            out.append((cx, cy, text.strip(), float(conf)))
+        return out
+    except Exception:
+        return []
+
+
+def _ocr_combined(arr: np.ndarray) -> list:
+    """
+    משלב Tesseract + EasyOCR.
+    מוסיף EasyOCR רק אם מותקן — מכפיל סיכוי לקריאה נכונה.
+    מסיר כפילויות (אותו מיקום ±20px).
+    """
+    items_t = _ocr_full(arr)       # Tesseract (מהיר)
+    items_e = _ocr_easyocr(arr)    # EasyOCR (מדויק יותר, איטי)
+
+    merged = list(items_t)
+    for cx2, cy2, text2, conf2 in items_e:
+        # הוסף רק אם אין פריט קרוב מ-Tesseract
+        dup = any(abs(cx2 - cx) < 20 and abs(cy2 - cy) < 15
+                  for cx, cy, _, _ in items_t)
+        if not dup:
+            merged.append((cx2, cy2, text2, conf2))
+    return merged
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  עזר
 # ─────────────────────────────────────────────────────────────────────────────
@@ -328,8 +364,9 @@ def _extract_shtachim(items: list, img_w: int) -> list:
 #  עיבוד עמוד
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _process_page(arr: np.ndarray) -> list:
-    items = _ocr_full(arr)
+def _process_page(arr: np.ndarray, use_combined: bool = False) -> list:
+    # בחר מנוע OCR
+    items = _ocr_combined(arr) if use_combined else _ocr_full(arr)
     img_w = arr.shape[1]
     page_type = _detect_page_type(items, img_w)
 
@@ -340,7 +377,7 @@ def _process_page(arr: np.ndarray) -> list:
     elif page_type == 'shtachim':
         pts = _extract_sztachim(items, img_w)
     else:
-        pts = _extract_matzola(items, img_w, arr)  # ברירת מחדל
+        pts = _extract_matzola(items, img_w, arr)
 
     return pts
 
@@ -366,7 +403,12 @@ def extract_from_tif(
     progress_cb=None,
     max_pages: int = 0,
     reference_df: pd.DataFrame = None,
+    use_combined: bool = False,
 ) -> pd.DataFrame:
+    """
+    use_combined=True  → Tesseract + EasyOCR (מדויק יותר, איטי יותר)
+    use_combined=False → Tesseract בלבד (מהיר)
+    """
     if reference_df is not None and len(reference_df) > 0:
         return extract_with_csv_reference(file_bytes, reference_df, progress_cb)
 
@@ -376,7 +418,6 @@ def extract_from_tif(
         n_pages = max_pages
 
     all_points = []
-    # סרוק מהדף האחרון לראשון — קואורדינטות בדרך כלל בדפים האחרונים
     page_order = list(range(n_pages - 1, -1, -1))
     for idx, page_num in enumerate(page_order):
         img.seek(page_num)
@@ -385,7 +426,7 @@ def extract_from_tif(
             continue
         arr = _prepare(img)
         try:
-            pts = _process_page(arr)
+            pts = _process_page(arr, use_combined=use_combined)
             all_points.extend(pts)
         except Exception as e:
             print(f"Page {page_num+1}: {e}")
