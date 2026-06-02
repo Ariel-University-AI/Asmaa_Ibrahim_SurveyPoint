@@ -443,8 +443,9 @@ with tab_ocr:
                     _names = [m['name'] for m in _list.json().get('models', [])
                               if 'generateContent' in m.get('supportedGenerationMethods', [])]
                     st.info(f"מודלים זמינים: {', '.join(_names[:5])}")
-                    # נסה את הראשון
-                    _model = _names[0].split('/')[-1] if _names else 'gemini-pro'
+                    # העדף 2.0-flash (יציב), לא 2.5-flash (עמוס)
+                    _preferred = [n for n in _names if '2.0-flash' in n and 'lite' not in n]
+                    _model = (_preferred[0] if _preferred else _names[0]).split('/')[-1] if _names else 'gemini-2.0-flash'
                     _url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                             f"{_model}:generateContent{_qp}")
                     _res = _req.post(_url, headers=_hdr,
