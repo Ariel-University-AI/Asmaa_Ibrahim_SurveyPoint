@@ -500,33 +500,16 @@ def extract_with_gemini(
     חילוץ קואורדינטות באמצעות Gemini Vision — דיוק גבוה על כתב יד.
     מודל: gemini-1.5-flash (חינם, 15 בקשות/דקה)
     """
-    import google.generativeai as genai_old
+    from google import genai as _genai_new
     import json, time
 
-    genai_old.configure(api_key=api_key)
-
-    # נסה מודלים שונים עד שמוצאים אחד שעובד
-    CANDIDATES = [
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro-latest',
-        'gemini-pro-vision',
-        'gemini-1.0-pro-vision',
-    ]
-    model = None
-    working_model = None
-    for candidate in CANDIDATES:
-        try:
-            m = genai_old.GenerativeModel(candidate)
-            m.generate_content("test")
-            model = m
-            working_model = candidate
-            print(f"Using Gemini model: {candidate}")
-            break
-        except Exception:
-            continue
-    if model is None:
-        raise RuntimeError("לא נמצא מודל Gemini זמין. בדקי שה-API Key תקין.")
+    # השתמש בגרסה החדשה עם api_version=v1 (לא v1beta)
+    client = _genai_new.Client(
+        api_key=api_key,
+        http_options={'api_version': 'v1'},
+    )
+    GEMINI_MODEL = "gemini-1.5-flash"
+    print(f"Using Gemini model: {GEMINI_MODEL} (v1)")
 
     PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך.
 חלץ את כל הקואורדינטות מהטבלה.
@@ -557,9 +540,14 @@ def extract_with_gemini(
         img_bytes = buf.getvalue()
 
         try:
-            from PIL import Image as _PIL
-            pil_page = _PIL.open(io.BytesIO(img_bytes))
-            response = model.generate_content([pil_page, PROMPT])
+            from google.genai import types as _gt
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=[
+                    _gt.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+                    PROMPT,
+                ],
+            )
             text = response.text.strip()
             print(f"Page {page_num+1}: Gemini responded {len(text)} chars")
             # נקה markdown אם יש

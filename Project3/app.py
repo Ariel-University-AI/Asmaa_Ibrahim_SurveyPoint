@@ -429,20 +429,14 @@ with tab_ocr:
             if st.button("🔗 בדוק חיבור", key="test_gemini"):
                 try:
                     from google import genai as _genai
-                    import google.generativeai as _g
-                    _g.configure(api_key=gemini_key)
-                    # נסה מודלים עד שמוצאים אחד שעובד
-                    _models = ['gemini-1.5-flash','gemini-1.5-flash-latest',
-                               'gemini-pro','gemini-1.0-pro']
-                    _r = None
-                    for _mn in _models:
-                        try:
-                            _r = _g.GenerativeModel(_mn).generate_content("Say OK")
-                            break
-                        except Exception:
-                            continue
-                    if _r is None:
-                        raise RuntimeError("לא נמצא מודל")
+                    from google import genai as _gn
+                    from google.genai import types as _gt
+                    _c = _gn.Client(api_key=gemini_key,
+                                    http_options={'api_version': 'v1'})
+                    _r = _c.models.generate_content(
+                        model="gemini-1.5-flash",
+                        contents=["Say OK in one word"]
+                    )
                     st.success(f"✅ Gemini מחובר! תשובה: {_r.text.strip()[:20]}")
                 except Exception as _e:
                     st.error(f"❌ שגיאה: {_e}")
