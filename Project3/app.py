@@ -411,31 +411,27 @@ with tab_ocr:
     st.markdown('<div class="section-title">📄 חילוץ קואורדינטות מתיק חישובים</div>',
                 unsafe_allow_html=True)
 
-    col_inst, col_up = st.columns([2, 3])
+    st.markdown("""
+    <div class="card">
+    <b style="color:#FFD700">🎓 מצב לימוד (מומלץ לדמו):</b>
+    <span style="color:#90e0ef"> העלה TIF + CSV קיים → המערכת <b>מאמתת</b> את ה-OCR מול הערכים הידועים → דיוק גבוה!</span><br><br>
+    <b style="color:#00b4d8">🔍 מצב OCR בלבד:</b>
+    <span style="color:#90e0ef"> העלה TIF בלבד → חילוץ אוטומטי ללא אימות</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with col_inst:
-        st.markdown("""
-        <div class="card">
-        <b style="color:#FFD700">איך משתמשים:</b><br>
-        <span style="color:#90e0ef">
-        🔹 שלב 1: העלה קובץ TIF או PDF<br>
-        🔹 שלב 2: בחר כמה עמודים לעבד<br>
-        🔹 שלב 3: לחץ "התחל חילוץ"<br>
-        🔹 שלב 4: ראה קואורדינטות + גרף<br>
-        🔹 שלב 5: הורד CSV מסודר
-        </span><br><br>
-        <span style="color:#FFD700; font-size:0.9rem">
-        ⚠️ OCR עובד על מסמכים סרוקים.<br>
-        כתב יד ישן עשוי לדרוש בדיקה ידנית.
-        </span>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_up:
+    col_tif, col_csv = st.columns(2)
+    with col_tif:
         uploaded = st.file_uploader(
-            "גרור קובץ TIF או PDF",
+            "📄 קובץ TIF או PDF (תיק חישובים)",
             type=["tif", "TIF", "tiff", "TIFF", "pdf", "PDF"],
             key="ocr_upload",
+        )
+    with col_csv:
+        ref_csv = st.file_uploader(
+            "📊 קובץ CSV לימוד (אופציונלי — לדיוק גבוה)",
+            type=["csv", "CSV"],
+            key="ref_csv",
         )
 
     if uploaded is not None:
@@ -472,6 +468,15 @@ with tab_ocr:
                 <div style="color:#90e0ef">~{est} דקות</div>
                 </div>""", unsafe_allow_html=True)
 
+        # טען CSV לימוד אם הועלה
+        ref_df = None
+        if ref_csv is not None:
+            ref_df = load_csv_file(ref_csv.read(), is_bytes=True)
+            if ref_df is not None:
+                st.success(f"📊 CSV לימוד נטען: **{len(ref_df)} נקודות** — מצב דיוק גבוה מופעל!")
+            else:
+                st.warning("לא ניתן לקרוא את קובץ ה-CSV")
+
         if st.button("🚀 התחל חילוץ קואורדינטות", type="primary", key="ocr_btn"):
             try:
                 from extractor import extract_from_tif, extract_from_pdf
@@ -479,47 +484,75 @@ with tab_ocr:
                 st.error(f"שגיאת טעינה: {e}")
                 st.stop()
 
-            prog  = st.progress(0)
-            stat  = st.empty()
+            prog = st.progress(0)
+            stat = st.empty()
 
             def cb(done, total):
                 prog.progress(int(done / total * 100))
                 stat.text(f"מעבד עמוד {done} מתוך {total}...")
 
-            with st.spinner("מריץ OCR..."):
+            mode = "🎓 מצב לימוד (CSV + OCR)" if ref_df is not None else "🔍 OCR בלבד"
+            with st.spinner(f"מריץ חילוץ — {mode}..."):
                 try:
                     if fname.endswith(".pdf"):
                         df_ocr = extract_from_pdf(file_bytes)
                     else:
-                        df_ocr = extract_from_tif(file_bytes,
-                                                   progress_cb=cb,
-                                                   max_pages=max_pages)
+                        df_ocr = extract_from_tif(
+                            file_bytes,
+                            progress_cb=cb,
+                            max_pages=max_pages,
+                            reference_df=ref_df,
+                        )
                     prog.progress(100)
                     stat.empty()
                 except Exception as e:
                     st.error(f"שגיאה בחילוץ: {e}")
                     df_ocr = pd.DataFrame(columns=["שם נקודה", "Y", "X"])
 
-            st.session_state["ocr_df"] = df_ocr if len(df_ocr) > 0 else None
+            # שמור רק עמודות ליבה לזיהוי חריגים
+            core_cols = ["שם נקודה", "Y", "X"]
+            ocr_core = df_ocr[core_cols] if all(c in df_ocr.columns for c in core_cols) else df_ocr
+            st.session_state["ocr_df"] = ocr_core if len(ocr_core) > 0 else None
 
             if len(df_ocr) == 0:
-                st.warning("לא נמצאו קואורדינטות. ייתכן שהמסמך בכתב יד קשה לקריאה.")
+                st.warning("לא נמצאו קואורדינטות.")
             else:
-                st.success(f"✅ חולצו **{len(df_ocr)}** נקודות!")
+                # הצג מדדים
+                n_total = len(df_ocr)
+                has_src = "מקור" in df_ocr.columns
+                n_ocr = (df_ocr["מקור"] == "OCR ✓").sum() if has_src else n_total
+                n_csv = (df_ocr["מקור"] != "OCR ✓").sum() if has_src else 0
 
+                if has_src:
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("📍 סה״כ נקודות", n_total)
+                    c2.metric("✅ נמצאו ב-OCR", n_ocr)
+                    c3.metric("📋 הושלמו מ-CSV", n_csv)
+                else:
+                    st.success(f"✅ חולצו **{n_total}** נקודות!")
+
+                # גרף וטבלה
                 col_t, col_p = st.columns([1, 2])
                 with col_t:
-                    st.dataframe(df_ocr, use_container_width=True, height=320,
-                        column_config={
-                            "Y": st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
-                            "X": st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
-                        })
+                    display_cols = {
+                        "Y": st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
+                        "X": st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
+                    }
+                    if has_src:
+                        display_cols["מקור"] = st.column_config.TextColumn("מקור")
+                    st.dataframe(df_ocr, use_container_width=True, height=340,
+                                 column_config=display_cols)
                 with col_p:
-                    fig_o = px.scatter(df_ocr, x="Y", y="X",
-                                       hover_name="שם נקודה",
-                                       color_discrete_sequence=["#00b4d8"])
-                    fig_o.update_traces(marker=dict(size=9))
-                    fig_o.update_layout(**PLOT_STYLE, height=320,
+                    color_col = "מקור" if has_src else None
+                    fig_o = px.scatter(
+                        df_ocr, x="Y", y="X", hover_name="שם נקודה",
+                        color=color_col,
+                        color_discrete_map={"OCR ✓": "#00ff88",
+                                            "CSV (לא נמצא ב-OCR)": "#FFD700"},
+                        color_discrete_sequence=["#00b4d8"],
+                    )
+                    fig_o.update_traces(marker=dict(size=7))
+                    fig_o.update_layout(**PLOT_STYLE, height=340,
                         xaxis=dict(title="Y", gridcolor="rgba(0,180,216,0.15)", zeroline=False),
                         yaxis=dict(title="X", gridcolor="rgba(0,180,216,0.15)", zeroline=False),
                     )
