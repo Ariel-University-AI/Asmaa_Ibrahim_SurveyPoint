@@ -15,8 +15,13 @@ _reader = None
 def _get_reader():
     global _reader
     if _reader is None:
-        import easyocr
-        _reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        from paddleocr import PaddleOCR
+        _reader = PaddleOCR(
+            use_angle_cls=True,
+            lang='en',
+            use_gpu=False,
+            show_log=False,
+        )
     return _reader
 
 
@@ -231,9 +236,23 @@ def _has_enough_text(img: Image.Image, min_density=0.03, max_density=0.6) -> boo
 
 # ── עיבוד עמוד בודד ──────────────────────────────────────────────────────────
 
+def _paddle_to_standard(paddle_result) -> list:
+    """ממיר פלט PaddleOCR לפורמט אחיד: [(bbox, text, conf), ...]"""
+    items = []
+    if not paddle_result or not paddle_result[0]:
+        return items
+    for line in paddle_result[0]:
+        if line is None:
+            continue
+        bbox, (text, conf) = line
+        items.append((bbox, text, conf))
+    return items
+
+
 def _process_page(img_array) -> list:
     reader = _get_reader()
-    results = reader.readtext(img_array, detail=1)
+    raw = reader.ocr(img_array, cls=True)
+    results = _paddle_to_standard(raw)
     img_w = img_array.shape[1]
     rows = _group_rows(results)
 
