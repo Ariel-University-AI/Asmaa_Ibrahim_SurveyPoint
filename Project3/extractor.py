@@ -525,35 +525,57 @@ def extract_with_gemini(
                f"{GEMINI_MODEL}:generateContent{QP}")
     print(f"Model: {GEMINI_MODEL}")
 
-    PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך בישראל.
-חלץ את כל הנקודות עם שם נקודה + קואורדינטות Y ו-X.
-חפש בכל סוג טבלה: חשוב מצולע, חשוב קואורדינטות, חשוב שטחים.
-העתק ערכים בדיוק. אל תמציא נקודות.
-החזר JSON בלבד: [{"name": "שם", "Y": 0.0, "X": 0.0}, ...]
-אם אין קואורדינטות — החזר: []"""
+    PROMPT_PAIR = """התמונה מכילה {n} דפים מתיק חישובים הנדסי (מוצגים אחד מעל השני).
+חלץ את כל הנקודות עם שם נקודה + Y + X מכל הדפים.
+חפש: חשוב מצולע, חשוב קואורדינטות, חשוב שטחים.
+העתק ערכים בדיוק. אל תמציא.
+החזר JSON בלבד: [{"name":"שם","Y":0.0,"X":0.0}, ...]
+אין קואורדינטות — החזר: []"""
 
-    # הכן תמונות לכל הדפים מראש
+    # הכן תמונות — קבץ זוגות של דפים לתמונה אחת
     src = Image.open(io.BytesIO(tif_bytes))
     n_pages = getattr(src, 'n_frames', 1)
-    pages_bytes = {}
+
+    # אסוף דפים עם תוכן
+    raw_pages = []
     for p in range(n_pages):
         src.seek(p)
-        if not _has_content(src):
-            continue
+        if _has_content(src):
+            raw_pages.append((p, src.convert('RGB').copy()))
+
+    # הדבק כל 2 דפים אנכית לתמונה אחת
+    def _stack(imgs):
+        w = max(i.width for i in imgs)
+        imgs_r = [i.resize((w, int(i.height * w / i.width)), Image.LANCZOS) for i in imgs]
+        h = sum(i.height for i in imgs_r)
+        out = Image.new('RGB', (w, h), (255, 255, 255))
+        y = 0
+        for img in imgs_r:
+            out.paste(img, (0, y))
+            y += img.height
+        return out
+
+    BATCH = 2  # כמה דפים בכל בקשה
+    pages_bytes = {}  # key=batch_idx → (jpeg_bytes, n_pages_in_batch)
+    for i in range(0, len(raw_pages), BATCH):
+        group = raw_pages[i:i+BATCH]
+        combined = _stack([g[1] for g in group])
         buf = io.BytesIO()
-        src.convert('RGB').save(buf, format='JPEG', quality=85)
-        pages_bytes[p] = buf.getvalue()
+        combined.save(buf, format='JPEG', quality=85)
+        pages_bytes[i] = (buf.getvalue(), len(group))
 
     # Rate limiter: מרווח מינימלי בין בקשות
     _last = [0.0]
     _lock = threading.Lock()
     MIN_GAP = 2.1  # שניות בין בקשות (30 RPM = 1 בקשה כל 2 שניות)
 
-    def _call_gemini(page_num: int) -> list:
-        img_b64 = base64.b64encode(pages_bytes[page_num]).decode()
+    def _call_gemini(batch_idx: int) -> list:
+        img_bytes_val, n_in_batch = pages_bytes[batch_idx]
+        img_b64 = base64.b64encode(img_bytes_val).decode()
+        prompt  = PROMPT_PAIR.format(n=n_in_batch)
         payload = {"contents": [{"parts": [
             {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
-            {"text": PROMPT}
+            {"text": prompt}
         ]}]}
         for attempt in range(4):
             # המתן לפי rate limiter
@@ -585,20 +607,20 @@ def extract_with_gemini(
                             pts.append({'שם נקודה': name, 'Y': y, 'X': x})
                     except Exception:
                         pass
-                print(f"P{page_num+1}: {len(pts)} pts")
+                print(f"Batch {batch_idx}: {len(pts)} pts")
                 return pts
             except Exception as ex:
-                print(f"P{page_num+1} err: {ex}")
+                print(f"Batch {batch_idx} err: {ex}")
                 return []
         return []
 
-    # הרץ עד 3 דפים במקביל
+    # ~21 בקשות (41 דפים / 2) — עד 10 בו-זמנית
     all_points = []
     done = [0]
     total = len(pages_bytes)
 
     with ThreadPoolExecutor(max_workers=10) as exe:
-        futs = {exe.submit(_call_gemini, p): p for p in pages_bytes}
+        futs = {exe.submit(_call_gemini, idx): idx for idx in pages_bytes}
         for fut in as_completed(futs):
             all_points.extend(fut.result())
             done[0] += 1
