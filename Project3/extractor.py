@@ -598,9 +598,14 @@ def extract_with_gemini(
                 pts = []
                 for item in parsed:
                     try:
-                        name = str(item.get('name', '')).strip()
-                        y = float(str(item.get('Y', 0)).replace(',', '.'))
-                        x = float(str(item.get('X', 0)).replace(',', '.'))
+                        # קבל שם נקודה מכל שדה אפשרי
+                        name = str(
+                            item.get('name') or item.get('nome') or
+                            item.get('שם') or item.get('point') or
+                            item.get('id') or ''
+                        ).strip()
+                        y = float(str(item.get('Y', item.get('y', 0))).replace(',', '.'))
+                        x = float(str(item.get('X', item.get('x', 0))).replace(',', '.'))
                         if name and y and x:
                             pts.append({'שם נקודה': name, 'Y': y, 'X': x})
                     except Exception:
@@ -613,18 +618,18 @@ def extract_with_gemini(
         return [{'שם נקודה': '__LIMIT', 'Y': 0, 'X': '429_RATE_LIMIT'}]
         return []
 
-    # ~21 בקשות (41 דפים / 2) — עד 10 בו-זמנית
+    # ביצוע סדרתי עם המתנה — בטוח מ-rate limit
     all_points = []
-    done = [0]
-    total = len(pages_bytes)
+    batch_list = sorted(pages_bytes.keys())
+    total = len(batch_list)
 
-    with ThreadPoolExecutor(max_workers=10) as exe:
-        futs = {exe.submit(_call_gemini, idx): idx for idx in pages_bytes}
-        for fut in as_completed(futs):
-            all_points.extend(fut.result())
-            done[0] += 1
-            if progress_cb:
-                progress_cb(done[0], total)
+    for i, idx in enumerate(batch_list):
+        pts = _call_gemini(idx)
+        all_points.extend(pts)
+        if progress_cb:
+            progress_cb(i + 1, total)
+        if i < total - 1:
+            time.sleep(3)  # 3 שניות בין בקשות = 20 RPM (בטוח)
 
     if not all_points:
         return pd.DataFrame(columns=['שם נקודה', 'Y', 'X'])
