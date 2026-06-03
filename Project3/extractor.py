@@ -547,7 +547,7 @@ def extract_with_gemini(
     # Rate limiter: מרווח מינימלי בין בקשות
     _last = [0.0]
     _lock = threading.Lock()
-    MIN_GAP = 2.0  # שניות בין בקשות
+    MIN_GAP = 2.1  # שניות בין בקשות (30 RPM = 1 בקשה כל 2 שניות)
 
     def _call_gemini(page_num: int) -> list:
         img_b64 = base64.b64encode(pages_bytes[page_num]).decode()
@@ -597,7 +597,7 @@ def extract_with_gemini(
     done = [0]
     total = len(pages_bytes)
 
-    with ThreadPoolExecutor(max_workers=3) as exe:
+    with ThreadPoolExecutor(max_workers=10) as exe:
         futs = {exe.submit(_call_gemini, p): p for p in pages_bytes}
         for fut in as_completed(futs):
             all_points.extend(fut.result())
