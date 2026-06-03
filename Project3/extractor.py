@@ -497,11 +497,9 @@ def extract_with_gemini(
     progress_cb=None,
 ) -> pd.DataFrame:
     """
-    שולח כל דף TIF ל-Gemini — עד 3 דפים בו-זמנית.
-    מחזיר DataFrame עם כל הקואורדינטות מכל הדפים.
+    שולח כל דף TIF ל-Gemini אחד-אחד, מחזיר כל הקואורדינטות.
     """
-    import requests, base64, json, time, threading
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import requests, base64, json, time
 
     # Header לפי פורמט Key
     HDR = {"x-goog-api-key": api_key} if not api_key.startswith("AIzaSy") else {}
@@ -525,131 +523,96 @@ def extract_with_gemini(
                f"{GEMINI_MODEL}:generateContent{QP}")
     print(f"Model: {GEMINI_MODEL}")
 
-    PROMPT_PAIR = """התמונה מכילה {n} דפים מתיק חישובים הנדסי (מוצגים אחד מעל השני).
-חלץ את כל הנקודות עם שם נקודה + Y + X מכל הדפים.
-חפש: חשוב מצולע, חשוב קואורדינטות, חשוב שטחים.
-העתק ערכים בדיוק. אל תמציא.
+    PROMPT = """חלץ את כל הנקודות עם שם נקודה + Y + X מהדף.
+חפש בכל טבלה: חשוב מצולע, חשוב קואורדינטות, חשוב שטחים.
+העתק ערכים בדיוק. אל תמציא נקודות.
 החזר JSON בלבד: [{"name":"שם","Y":0.0,"X":0.0}, ...]
-אין קואורדינטות — החזר: []"""
+אין קואורדינטות בדף זה — החזר: []"""
 
-    # הכן תמונות — קבץ זוגות של דפים לתמונה אחת
+    # פתח TIF וספור עמודים
     src = Image.open(io.BytesIO(tif_bytes))
     n_pages = getattr(src, 'n_frames', 1)
+    print(f"TIF: {n_pages} pages")
 
-    # אסוף דפים עם תוכן
-    raw_pages = []
+    all_points = []
+    processed = 0
+
     for p in range(n_pages):
         src.seek(p)
-        if _has_content(src):
-            raw_pages.append((p, src.convert('RGB').copy()))
 
-    # הדבק כל 2 דפים אנכית לתמונה אחת
-    def _stack(imgs):
-        w = max(i.width for i in imgs)
-        imgs_r = [i.resize((w, int(i.height * w / i.width)), Image.LANCZOS) for i in imgs]
-        h = sum(i.height for i in imgs_r)
-        out = Image.new('RGB', (w, h), (255, 255, 255))
-        y = 0
-        for img in imgs_r:
-            out.paste(img, (0, y))
-            y += img.height
-        return out
+        # בדיקת תוכן פשוטה
+        arr = np.array(src.convert('L'))
+        black_ratio = (arr < 128).mean()
+        if black_ratio < 0.01 or black_ratio > 0.85:
+            print(f"P{p+1}: skip (black={black_ratio:.2f})")
+            if progress_cb:
+                progress_cb(p + 1, n_pages)
+            continue
 
-    BATCH = 4  # כמה דפים בכל בקשה (41 דפים / 4 = ~10 בקשות)
-    pages_bytes = {}  # key=batch_idx → (jpeg_bytes, n_pages_in_batch)
-    for i in range(0, len(raw_pages), BATCH):
-        group = raw_pages[i:i+BATCH]
-        combined = _stack([g[1] for g in group])
+        # המר לJPEG קטן
         buf = io.BytesIO()
-        combined.save(buf, format='JPEG', quality=85)
-        pages_bytes[i] = (buf.getvalue(), len(group))
+        src.convert('RGB').save(buf, format='JPEG', quality=80)
+        img_b64 = base64.b64encode(buf.getvalue()).decode()
+        print(f"P{p+1}: sending ({len(buf.getvalue())//1024}KB)...")
 
-    # Rate limiter: מרווח מינימלי בין בקשות
-    _last = [0.0]
-    _lock = threading.Lock()
-    MIN_GAP = 2.1  # שניות בין בקשות (30 RPM = 1 בקשה כל 2 שניות)
-
-    def _call_gemini(batch_idx: int) -> list:
-        img_bytes_val, n_in_batch = pages_bytes[batch_idx]
-        img_b64 = base64.b64encode(img_bytes_val).decode()
-        prompt  = PROMPT_PAIR.format(n=n_in_batch)
+        # שלח לGemini
         payload = {"contents": [{"parts": [
             {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
-            {"text": prompt}
+            {"text": PROMPT}
         ]}]}
-        for attempt in range(2):   # מקסימום 2 ניסיונות — לא 20 דקות!
-            with _lock:
-                wait = _last[0] + MIN_GAP - time.time()
-                if wait > 0:
-                    time.sleep(wait)
-                _last[0] = time.time()
+
+        pts = []
+        for attempt in range(3):
             try:
-                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=60)
+                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=90)
                 if resp.status_code == 429:
-                    print(f"Batch {batch_idx}: 429 - wait 10s")
-                    time.sleep(10)
+                    wait = 15 * (attempt + 1)
+                    print(f"P{p+1}: 429, wait {wait}s...")
+                    time.sleep(wait)
                     continue
                 resp.raise_for_status()
                 text = resp.json()['candidates'][0]['content']['parts'][0]['text']
                 s, e = text.find('['), text.rfind(']')
-                if s == -1 or e <= s:
-                    return []
-                parsed = json.loads(text[s:e+1])
-                pts = []
-                for item in parsed:
-                    try:
-                        # קבל שם נקודה מכל שדה אפשרי
-                        name = str(
-                            item.get('name') or item.get('nome') or
-                            item.get('שם') or item.get('point') or
-                            item.get('id') or ''
-                        ).strip()
-                        y = float(str(item.get('Y', item.get('y', 0))).replace(',', '.'))
-                        x = float(str(item.get('X', item.get('x', 0))).replace(',', '.'))
-                        if name and y and x:
-                            pts.append({'שם נקודה': name, 'Y': y, 'X': x})
-                    except Exception:
-                        pass
-                print(f"Batch {batch_idx}: {len(pts)} pts")
-                return pts
+                if s != -1 and e > s:
+                    parsed = json.loads(text[s:e+1])
+                    for item in parsed:
+                        try:
+                            name = str(
+                                item.get('name') or item.get('nome') or
+                                item.get('שם') or item.get('point') or ''
+                            ).strip()
+                            y = float(str(item.get('Y', item.get('y', 0))).replace(',', '.'))
+                            x = float(str(item.get('X', item.get('x', 0))).replace(',', '.'))
+                            if name and y > 0 and x > 0:
+                                pts.append({'שם נקודה': name, 'Y': y, 'X': x})
+                        except Exception:
+                            pass
+                print(f"P{p+1}: {len(pts)} pts found")
+                break
             except Exception as ex:
-                print(f"Batch {batch_idx} err: {type(ex).__name__}: {ex}")
-                return [{'שם נקודה': f'__ERR', 'Y': 0, 'X': str(ex)[:80]}]
-        return [{'שם נקודה': '__LIMIT', 'Y': 0, 'X': '429_RATE_LIMIT'}]
-        return []
+                print(f"P{p+1} err: {ex}")
+                break
 
-    # ביצוע סדרתי עם המתנה — בטוח מ-rate limit
-    all_points = []
-    batch_list = sorted(pages_bytes.keys())
-    total = len(batch_list)
-
-    for i, idx in enumerate(batch_list):
-        pts = _call_gemini(idx)
         all_points.extend(pts)
+        processed += 1
+
         if progress_cb:
-            progress_cb(i + 1, total)
-        if i < total - 1:
-            time.sleep(3)  # 3 שניות בין בקשות = 20 RPM (בטוח)
+            progress_cb(p + 1, n_pages)
+
+        # המתן בין בקשות
+        if p < n_pages - 1:
+            time.sleep(4)
+
+    print(f"Done: {len(all_points)} total points from {processed} pages")
 
     if not all_points:
         return pd.DataFrame(columns=['שם נקודה', 'Y', 'X'])
 
     df = pd.DataFrame(all_points)
-
-    # הצג שגיאות אם יש
-    errors = df[df['שם נקודה'].str.startswith('__', na=False)]
-    if len(errors) > 0:
-        err_msgs = errors['X'].unique()
-        print(f"ERRORS: {list(err_msgs)}")
-
-    # סנן רק נקודות תקינות
-    df = df[~df['שם נקודה'].str.startswith('__', na=False)]
     df['Y'] = pd.to_numeric(df['Y'], errors='coerce')
     df['X'] = pd.to_numeric(df['X'], errors='coerce')
     df = df.dropna(subset=['Y', 'X'])
-    df = df[df['Y'] > 0]
-    df = df.drop_duplicates(subset=['שם נקודה']).reset_index(drop=True)
-    return df
+    return df.drop_duplicates('שם נקודה').reset_index(drop=True)
 
 
 def extract_from_pdf(file_bytes: bytes) -> pd.DataFrame:
