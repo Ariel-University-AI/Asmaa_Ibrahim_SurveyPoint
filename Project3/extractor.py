@@ -577,19 +577,17 @@ def extract_with_gemini(
             {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
             {"text": prompt}
         ]}]}
-        for attempt in range(4):
-            # המתן לפי rate limiter
+        for attempt in range(2):   # מקסימום 2 ניסיונות — לא 20 דקות!
             with _lock:
                 wait = _last[0] + MIN_GAP - time.time()
                 if wait > 0:
                     time.sleep(wait)
                 _last[0] = time.time()
             try:
-                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=90)
+                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=60)
                 if resp.status_code == 429:
-                    backoff = 20 * (attempt + 1)
-                    print(f"P{page_num+1}: rate limit, wait {backoff}s")
-                    time.sleep(backoff)
+                    print(f"Batch {batch_idx}: 429 - wait 10s")
+                    time.sleep(10)
                     continue
                 resp.raise_for_status()
                 text = resp.json()['candidates'][0]['content']['parts'][0]['text']
@@ -610,8 +608,9 @@ def extract_with_gemini(
                 print(f"Batch {batch_idx}: {len(pts)} pts")
                 return pts
             except Exception as ex:
-                print(f"Batch {batch_idx} err: {ex}")
-                return []
+                print(f"Batch {batch_idx} err: {type(ex).__name__}: {ex}")
+                return [{'שם נקודה': f'__ERR', 'Y': 0, 'X': str(ex)[:80]}]
+        return [{'שם נקודה': '__LIMIT', 'Y': 0, 'X': '429_RATE_LIMIT'}]
         return []
 
     # ~21 בקשות (41 דפים / 2) — עד 10 בו-זמנית
@@ -631,9 +630,19 @@ def extract_with_gemini(
         return pd.DataFrame(columns=['שם נקודה', 'Y', 'X'])
 
     df = pd.DataFrame(all_points)
+
+    # הצג שגיאות אם יש
+    errors = df[df['שם נקודה'].str.startswith('__', na=False)]
+    if len(errors) > 0:
+        err_msgs = errors['X'].unique()
+        print(f"ERRORS: {list(err_msgs)}")
+
+    # סנן רק נקודות תקינות
+    df = df[~df['שם נקודה'].str.startswith('__', na=False)]
     df['Y'] = pd.to_numeric(df['Y'], errors='coerce')
     df['X'] = pd.to_numeric(df['X'], errors='coerce')
     df = df.dropna(subset=['Y', 'X'])
+    df = df[df['Y'] > 0]
     df = df.drop_duplicates(subset=['שם נקודה']).reset_index(drop=True)
     return df
 
