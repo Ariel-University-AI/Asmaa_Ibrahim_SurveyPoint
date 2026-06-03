@@ -514,8 +514,9 @@ def extract_with_gemini(
         avail = [m['name'].split('/')[-1] for m in lst.json().get('models', [])
                  if 'generateContent' in m.get('supportedGenerationMethods', [])
                  and 'flash' in m['name']]
-        lite = [m for m in avail if 'lite' in m]
-        GEMINI_MODEL = (lite or avail or ["gemini-2.0-flash-lite-001"])[0]
+        # בחר 2.5-flash (מודל חדש עם billing)
+        v25 = [m for m in avail if '2.5-flash' in m and 'pro' not in m]
+        GEMINI_MODEL = (v25 or avail or ["gemini-2.5-flash"])[0]
     except Exception:
         GEMINI_MODEL = "gemini-2.0-flash-lite-001"
 
