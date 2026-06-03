@@ -497,121 +497,113 @@ def extract_with_gemini(
     progress_cb=None,
 ) -> pd.DataFrame:
     """
-    חילוץ קואורדינטות באמצעות Gemini Vision — דיוק גבוה על כתב יד.
-    מודל: gemini-1.5-flash (חינם, 15 בקשות/דקה)
+    שולח כל דף TIF ל-Gemini — עד 3 דפים בו-זמנית.
+    מחזיר DataFrame עם כל הקואורדינטות מכל הדפים.
     """
-    import requests, base64, json, time
+    import requests, base64, json, time, threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    # הגדר Header לפי פורמט Key
-    if api_key.startswith("AIzaSy"):
-        HDR, QP = {}, f"?key={api_key}"
-    else:
-        HDR, QP = {"x-goog-api-key": api_key}, ""
+    # Header לפי פורמט Key
+    HDR = {"x-goog-api-key": api_key} if not api_key.startswith("AIzaSy") else {}
+    QP  = f"?key={api_key}" if api_key.startswith("AIzaSy") else ""
 
-    # מצא מודל זמין אוטומטית
-    lst = requests.get(
-        f"https://generativelanguage.googleapis.com/v1beta/models{QP}",
-        headers=HDR, timeout=10)
-    lst.raise_for_status()
-    # אסוף כל מודלי flash
-    models_avail = [
-        m['name'].split('/')[-1]
-        for m in lst.json().get('models', [])
-        if 'generateContent' in m.get('supportedGenerationMethods', [])
-        and 'flash' in m['name']
-    ]
-    # סדר עדיפות: lite (מכסה גבוהה) → 2.0-flash → כל אחד אחר
-    def _model_priority(name):
-        if 'lite' in name: return 0
-        if '2.0-flash' in name: return 1
-        return 2
-    models_avail.sort(key=_model_priority)
-    GEMINI_MODEL = models_avail[0] if models_avail else "gemini-2.0-flash-lite"
-    print(f"Using model: {GEMINI_MODEL}")
+    # מצא מודל זמין — lite קודם (מכסה גבוהה)
+    try:
+        lst = requests.get(
+            f"https://generativelanguage.googleapis.com/v1beta/models{QP}",
+            headers=HDR, timeout=10)
+        lst.raise_for_status()
+        avail = [m['name'].split('/')[-1] for m in lst.json().get('models', [])
+                 if 'generateContent' in m.get('supportedGenerationMethods', [])
+                 and 'flash' in m['name']]
+        lite = [m for m in avail if 'lite' in m]
+        GEMINI_MODEL = (lite or avail or ["gemini-2.0-flash-lite-001"])[0]
+    except Exception:
+        GEMINI_MODEL = "gemini-2.0-flash-lite-001"
 
     API_URL = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                f"{GEMINI_MODEL}:generateContent{QP}")
+    print(f"Model: {GEMINI_MODEL}")
 
     PROMPT = """זהו עמוד מתיק חישובים הנדסי של מודד מוסמך בישראל.
-משימה: חלץ את כל הנקודות שיש להן שם נקודה + קואורדינטות Y ו-X.
+חלץ את כל הנקודות עם שם נקודה + קואורדינטות Y ו-X.
+חפש בכל סוג טבלה: חשוב מצולע, חשוב קואורדינטות, חשוב שטחים.
+העתק ערכים בדיוק. אל תמציא נקודות.
+החזר JSON בלבד: [{"name": "שם", "Y": 0.0, "X": 0.0}, ...]
+אם אין קואורדינטות — החזר: []"""
 
-כללים:
-1. חפש בכל סוג טבלה — חשוב מצולע, חשוב קואורדינטות, חשוב שטחים
-2. העתק את הערכים בדיוק כמו שהם כתובים בדף — אל תשנה כלום
-3. שמות נקודות: מספרים (1, 15), עם אותיות (15A, 3B), קודים (1240G, 457M)
-4. אל תמציא נקודות — רק מה שכתוב בדף!
-
-החזר JSON בלבד, ללא טקסט נוסף:
-[{"name": "שם_נקודה", "Y": 644.32, "X": 694.54}, ...]
-
-אם אין קואורדינטות בדף — החזר: []"""
-
-    img = Image.open(io.BytesIO(tif_bytes))
-    n_pages = getattr(img, 'n_frames', 1)
-    all_points = []
-    debug_log = []   # ← אוסף מה Gemini מחזיר
-
-    for page_num in range(n_pages - 1, -1, -1):
-        img.seek(page_num)
-        if not _has_content(img):
-            if progress_cb: progress_cb(n_pages - page_num, n_pages)
+    # הכן תמונות לכל הדפים מראש
+    src = Image.open(io.BytesIO(tif_bytes))
+    n_pages = getattr(src, 'n_frames', 1)
+    pages_bytes = {}
+    for p in range(n_pages):
+        src.seek(p)
+        if not _has_content(src):
             continue
-
-        # המר לJPEG bytes
         buf = io.BytesIO()
-        img.convert('RGB').save(buf, format='JPEG', quality=90)
-        img_bytes = buf.getvalue()
+        src.convert('RGB').save(buf, format='JPEG', quality=85)
+        pages_bytes[p] = buf.getvalue()
 
-        try:
-            img_b64 = base64.b64encode(img_bytes).decode()
-            payload = {"contents": [{"parts": [
-                {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
-                {"text": PROMPT}
-            ]}]}
-            # retry עם המתנה אם יש rate limit (429)
-            for attempt in range(3):
-                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=60)
-                if resp.status_code == 429:
-                    wait = 30 * (attempt + 1)
-                    print(f"Rate limit — ממתין {wait}s...")
+    # Rate limiter: מרווח מינימלי בין בקשות
+    _last = [0.0]
+    _lock = threading.Lock()
+    MIN_GAP = 2.0  # שניות בין בקשות
+
+    def _call_gemini(page_num: int) -> list:
+        img_b64 = base64.b64encode(pages_bytes[page_num]).decode()
+        payload = {"contents": [{"parts": [
+            {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
+            {"text": PROMPT}
+        ]}]}
+        for attempt in range(4):
+            # המתן לפי rate limiter
+            with _lock:
+                wait = _last[0] + MIN_GAP - time.time()
+                if wait > 0:
                     time.sleep(wait)
+                _last[0] = time.time()
+            try:
+                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=90)
+                if resp.status_code == 429:
+                    backoff = 20 * (attempt + 1)
+                    print(f"P{page_num+1}: rate limit, wait {backoff}s")
+                    time.sleep(backoff)
                     continue
-                break
-            resp.raise_for_status()
-            text = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-            debug_log.append(f"P{page_num+1}: {text[:120]}")
-            print(f"Page {page_num+1}: {text[:80]}")
-            # חלץ JSON — greedy: מהסוגר הראשון לאחרון
-            start = text.find('[')
-            end   = text.rfind(']')
-            if start == -1 or end == -1 or end <= start:
-                print(f"Page {page_num+1}: no JSON: {text[:100]}")
-                continue
-            json_str = text[start:end+1]
-            parsed = json.loads(json_str)
-            for item in parsed:
-                try:
-                    name = str(item.get('name', '')).strip()
-                    y = float(str(item.get('Y', 0)).replace(',', '.'))
-                    x = float(str(item.get('X', 0)).replace(',', '.'))
-                    if name and y and x:
-                        all_points.append({'שם נקודה': name, 'Y': y, 'X': x})
-                except Exception:
-                    continue
+                resp.raise_for_status()
+                text = resp.json()['candidates'][0]['content']['parts'][0]['text']
+                s, e = text.find('['), text.rfind(']')
+                if s == -1 or e <= s:
+                    return []
+                parsed = json.loads(text[s:e+1])
+                pts = []
+                for item in parsed:
+                    try:
+                        name = str(item.get('name', '')).strip()
+                        y = float(str(item.get('Y', 0)).replace(',', '.'))
+                        x = float(str(item.get('X', 0)).replace(',', '.'))
+                        if name and y and x:
+                            pts.append({'שם נקודה': name, 'Y': y, 'X': x})
+                    except Exception:
+                        pass
+                print(f"P{page_num+1}: {len(pts)} pts")
+                return pts
+            except Exception as ex:
+                print(f"P{page_num+1} err: {ex}")
+                return []
+        return []
 
-        except Exception as e:
-            import traceback
-            err_msg = f"Page {page_num+1} error: {type(e).__name__}: {e}"
-            print(err_msg)
-            traceback.print_exc()
-            all_points.append({'שם נקודה': f'__ERROR_P{page_num+1}',
-                                'Y': -1, 'X': str(e)[:80]})
+    # הרץ עד 3 דפים במקביל
+    all_points = []
+    done = [0]
+    total = len(pages_bytes)
 
-        # Gemini free tier: 15 RPM → 5 שניות בין בקשות
-        time.sleep(5)
-
-        if progress_cb:
-            progress_cb(n_pages - page_num, n_pages)
+    with ThreadPoolExecutor(max_workers=3) as exe:
+        futs = {exe.submit(_call_gemini, p): p for p in pages_bytes}
+        for fut in as_completed(futs):
+            all_points.extend(fut.result())
+            done[0] += 1
+            if progress_cb:
+                progress_cb(done[0], total)
 
     if not all_points:
         return pd.DataFrame(columns=['שם נקודה', 'Y', 'X'])
