@@ -555,7 +555,7 @@ def extract_with_gemini(
             y += img.height
         return out
 
-    BATCH = 2  # כמה דפים בכל בקשה
+    BATCH = 4  # כמה דפים בכל בקשה (41 דפים / 4 = ~10 בקשות)
     pages_bytes = {}  # key=batch_idx → (jpeg_bytes, n_pages_in_batch)
     for i in range(0, len(raw_pages), BATCH):
         group = raw_pages[i:i+BATCH]
