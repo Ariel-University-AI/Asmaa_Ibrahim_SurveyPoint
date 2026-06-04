@@ -329,6 +329,7 @@ with tab_ocr:
 
             prog = st.progress(0)
             stat = st.empty()
+            t_start = __import__('time').time()
 
             def cb(done, total):
                 prog.progress(int(done / total * 100))
@@ -352,10 +353,12 @@ with tab_ocr:
             ocr_core = df_ocr[core_cols] if all(c in df_ocr.columns for c in core_cols) else df_ocr
             st.session_state["ocr_df"] = ocr_core if len(ocr_core) > 0 else None
 
+            elapsed = __import__('time').time() - t_start
+
             if len(df_ocr) == 0:
                 st.warning("לא נמצאו קואורדינטות.")
             else:
-                st.success(f"✅ חולצו **{len(df_ocr)} נקודות**!")
+                st.success(f"✅ חולצו **{len(df_ocr)} נקודות** | ⏱ {elapsed:.0f} שניות")
 
                 col_t, col_p = st.columns([1, 2])
                 with col_t:
