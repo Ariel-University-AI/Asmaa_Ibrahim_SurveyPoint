@@ -609,11 +609,16 @@ def show_anomaly_chart(df_res):
             text=df_bad["שם נקודה"],
             hovertemplate="<b>%{text}</b><br>Y:%{x:.3f}<br>X:%{y:.3f}<extra></extra>",
         ))
-    fig.update_layout(**PLOT_STYLE, height=460,
+    fig.update_layout(**PLOT_STYLE, height=460, showlegend=False,
         xaxis=dict(title="Y (צפון)", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
         yaxis=dict(title="X (מזרח)", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
     )
     st.plotly_chart(fig, use_container_width=True, key=ck())
+    st.markdown(
+        f'<div style="text-align:center;margin-top:-10px;font-size:.9rem;">'
+        f'<span style="color:#00ff88;margin-left:24px;">⬤ תקין ({n_ok})</span>'
+        f'<span style="color:#ff3333;">✕ חשוד ({n_bad})</span>'
+        f'</div>', unsafe_allow_html=True)
 
     # טבלה מלאה עם עמודת סטטוס
     st.markdown("### 📋 טבלת כל הקואורדינטות")
