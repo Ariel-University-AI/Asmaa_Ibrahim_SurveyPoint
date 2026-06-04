@@ -946,6 +946,7 @@ with tab_eda:
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("### פיזור נקודות")
+        st.caption("מיקום כל נקודת מדידה בשטח — מאפשר להבין את צורת הגוש/החלקה.")
         fig_sc = px.scatter(df_e, x="X", y="Y", hover_name="שם נקודה",
                             color_discrete_sequence=["#00D4FF"])
         fig_sc.update_traces(marker=dict(size=6))
@@ -956,22 +957,26 @@ with tab_eda:
         st.plotly_chart(fig_sc, use_container_width=True, key=ck())
 
     with col2:
-        st.markdown("### התפלגות Y")
+        st.markdown("### התפלגות Y (צפון)")
+        st.caption("כמה נקודות נמצאות בכל קטע צפון-דרום — מראה את הצפיפות לאורך ציר Y.")
         fig_hy = px.histogram(df_e, x="Y", nbins=25, color_discrete_sequence=["#ffd700"])
         fig_hy.update_layout(**PLOT_STYLE, height=360)
         st.plotly_chart(fig_hy, use_container_width=True, key=ck())
 
     col3, col4 = st.columns(2)
     with col3:
-        st.markdown("### התפלגות X")
+        st.markdown("### התפלגות X (מזרח)")
+        st.caption("כמה נקודות נמצאות בכל קטע מזרח-מערב — מראה את הצפיפות לאורך ציר X.")
         fig_hx = px.histogram(df_e, x="X", nbins=25, color_discrete_sequence=["#00ff88"])
         fig_hx.update_layout(**PLOT_STYLE, height=300)
         st.plotly_chart(fig_hx, use_container_width=True, key=ck())
     with col4:
         st.markdown("### סטטיסטיקה תיאורית")
+        st.caption("ערכי מינימום, מקסימום, ממוצע וסטיית תקן של קואורדינטות Y ו-X.")
         st.dataframe(df_e[["Y", "X"]].describe().round(3), use_container_width=True, height=290)
 
     st.markdown("### כל הנקודות")
+    st.caption("רשימה מלאה של כל הנקודות שחולצו מהתיק.")
     st.dataframe(df_e.reset_index(drop=True), use_container_width=True, hide_index=True,
                  column_config={
                      "Y": st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
