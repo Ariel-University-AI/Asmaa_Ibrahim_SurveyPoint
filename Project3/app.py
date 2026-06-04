@@ -591,7 +591,7 @@ def show_anomaly_chart(df_res):
     fig = go.Figure()
     if len(df_ok):
         fig.add_trace(go.Scatter(
-            x=df_ok["Y"], y=df_ok["X"], mode="markers", name="✅ תקין",
+            x=df_ok["Y"], y=df_ok["X"], mode="markers", name="תקין",
             marker=dict(size=7, color="#00ff88", symbol="circle",
                         line=dict(color="#00cc66", width=1)),
             text=df_ok["שם נקודה"],
@@ -599,7 +599,7 @@ def show_anomaly_chart(df_res):
         ))
     if len(df_bad):
         fig.add_trace(go.Scatter(
-            x=df_bad["Y"], y=df_bad["X"], mode="markers", name="⚠️ חשוד",
+            x=df_bad["Y"], y=df_bad["X"], mode="markers", name="חשוד",
             marker=dict(size=13, color="#ff3333", symbol="x",
                         line=dict(color="#ff0000", width=2.5)),
             text=df_bad["שם נקודה"],
