@@ -501,7 +501,24 @@ def get_datasets():
                 result[i] = files[0]
     return result
 
+def normalize_coords(df):
+    """תיקון אוטומטי של Y/X לכל מערכת קואורדינטות"""
+    df = df.copy()
+    y_med = df['Y'].median()
+    x_med = df['X'].median()
+    # בדיקה גלובלית: אם Y גדול מ-X ב-50% → מוחלף
+    if y_med > x_med * 1.5:
+        df[['Y', 'X']] = df[['X', 'Y']].values
+        y_med, x_med = x_med, y_med
+    # בדיקת שורה: רשת ישנה/ITM (X > 400k) — Y צריך להיות קטן מ-X
+    if x_med > 400_000:
+        mask = df['Y'] > df['X']
+        if mask.sum() > 0:
+            df.loc[mask, ['Y', 'X']] = df.loc[mask, ['X', 'Y']].values
+    return df
+
 def run_anomaly(df, contamination=0.05):
+    df = normalize_coords(df)   # תיקון Y/X לפני כל ניתוח
     model = IsolationForest(contamination=contamination, random_state=42, n_estimators=100)
     df = df.copy()
     df["pred"] = model.fit_predict(df[["Y", "X"]])
@@ -893,7 +910,7 @@ with tab_eda:
     st.markdown("---")
 
     if "ocr_df" in st.session_state and st.session_state["ocr_df"] is not None:
-        df_e = st.session_state["ocr_df"]
+        df_e = normalize_coords(st.session_state["ocr_df"])
         st.success(f"✅ מציג נתונים מחולצים — {len(df_e)} נקודות")
     elif DATASETS:
         sel_e = st.selectbox("בחר מערך:", [f"מערך {k}" for k in DATASETS.keys()], key="eda_sel")
