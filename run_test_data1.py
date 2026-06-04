@@ -9,7 +9,7 @@ import pandas as pd
 from extractor import extract_with_gemini
 
 # Dataset number — change to 1/2/3/4
-DATASET = "2"
+DATASET = "4"
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "DATA", DATASET)
 TIF_PATH = next((os.path.join(DATA_DIR, f) for f in os.listdir(DATA_DIR)
