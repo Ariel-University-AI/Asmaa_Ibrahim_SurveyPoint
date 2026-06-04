@@ -443,15 +443,22 @@ st.markdown("""
     </div>
     <div class="hero-title">SURVEYPOINT</div>
     <div class="hero-sub">חילוץ קואורדינטות מתיקי חישובים ישנים &nbsp;|&nbsp; זיהוי שגיאות מדידה אוטומטי &nbsp;|&nbsp; אוניברסיטת אריאל</div>
-    <div style="margin-top:18px;font-size:0.85rem;letter-spacing:2px;opacity:0.9;
-                background:linear-gradient(90deg,#00D4FF,#FFD700);
-                -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-                background-clip:text;position:relative;">
-        Every Point Has Its Place — SurveyPoint &nbsp;|&nbsp;
-        אסמאה בדיר איבראהים עיסא &nbsp;·&nbsp;
-        בהנחיית ד״ר ספרא אלי &nbsp;·&nbsp;
-        קורס איסוף ועיבוד מידע גאודטי &nbsp;·&nbsp;
-        אוניברסיטת אריאל 2026
+    <div style="margin-top:20px;border-top:1px solid rgba(0,212,255,0.15);padding-top:14px;position:relative;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:0.9rem;letter-spacing:3px;
+                    background:linear-gradient(90deg,#00D4FF,#FFD700);
+                    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                    background-clip:text;margin-bottom:6px;">
+            Every Point Has Its Place — SurveyPoint
+        </div>
+        <div style="font-size:0.78rem;letter-spacing:1.5px;opacity:0.75;
+                    background:linear-gradient(90deg,#90e0ef,#FFD700);
+                    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                    background-clip:text;">
+            אסמאה בדיר &amp; איבראהים עיסא &nbsp;·&nbsp;
+            בהנחיית ד״ר ספרא אלי &nbsp;·&nbsp;
+            קורס איסוף ועיבוד מידע גאודטי &nbsp;·&nbsp;
+            אוניברסיטת אריאל 2026
+        </div>
     </div>
     <div class="hero-coords">Y: 151,650.99<br>X: 243,464.96<br>&Delta;: &plusmn;0.003m</div>
     <div class="hero-status">
