@@ -650,8 +650,7 @@ def extract_with_gemini(
                 break
         return p, pts
 
-    # עבד ב-batches של 3 במקביל (איזון בין מהירות לדיוק)
-    BATCH = 3
+    BATCH = 5
     results = {}
 
     for batch_start in range(0, n_pages, BATCH):
@@ -683,17 +682,17 @@ def extract_with_gemini(
     df = df.dropna(subset=['Y', 'X'])
 
     # dedup חכם: לכל שם — שמור הקואורדינטה שמופיעה הכי הרבה (voting)
-    def _best_coord(group):
+    best_rows = []
+    for name, group in df.groupby('שם נקודה', sort=False):
         y_mode = group['Y'].round(1).mode()
         x_mode = group['X'].round(1).mode()
         best_y = y_mode.iloc[0] if len(y_mode) else group['Y'].iloc[0]
         best_x = x_mode.iloc[0] if len(x_mode) else group['X'].iloc[0]
         mask = (group['Y'].round(1) == round(best_y, 1)) & \
                (group['X'].round(1) == round(best_x, 1))
-        return group[mask].iloc[0] if mask.any() else group.iloc[0]
-
-    df = df.groupby('שם נקודה', sort=False).apply(_best_coord).reset_index(drop=True)
-    return df
+        row = group[mask].iloc[0] if mask.any() else group.iloc[0]
+        best_rows.append({'שם נקודה': name, 'Y': float(row['Y']), 'X': float(row['X'])})
+    return pd.DataFrame(best_rows)
 
 
 def spatial_match_to_reference(

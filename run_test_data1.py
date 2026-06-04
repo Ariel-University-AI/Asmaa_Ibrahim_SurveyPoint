@@ -57,7 +57,8 @@ orig.columns = ["name", "Y", "X"]
 orig["name"] = orig["name"].astype(str).str.strip()
 
 ext = df_ext.copy()
-ext.columns = [c if c != "שם נקודה" else "name" for c in ext.columns]
+name_col = ext.columns[0]
+ext = ext.rename(columns={name_col: "name"})
 ext["name"] = ext["name"].astype(str).str.strip()
 
 y_med_ext = ext["Y"].median()
