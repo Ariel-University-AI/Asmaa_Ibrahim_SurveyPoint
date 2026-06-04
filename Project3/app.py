@@ -25,46 +25,155 @@ st.markdown("""
 * { font-family: 'Heebo', sans-serif !important; direction: rtl; }
 .stApp { background: #0A0E1A; }
 
-/* Hero */
+/* ══ HERO — Engineering Scanner ══ */
+@keyframes scan-beam {
+    0%   { top: 0%; opacity: 0; }
+    5%   { opacity: 1; }
+    95%  { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+}
+@keyframes pulse-ring {
+    0%   { transform: scale(0.85); opacity: 0.9; }
+    50%  { transform: scale(1.05); opacity: 0.5; }
+    100% { transform: scale(0.85); opacity: 0.9; }
+}
+@keyframes pulse-ring2 {
+    0%   { transform: scale(1); opacity: 0.6; }
+    50%  { transform: scale(1.2); opacity: 0.2; }
+    100% { transform: scale(1); opacity: 0.6; }
+}
+@keyframes coord-blink {
+    0%,88%,100% { opacity: 1; }
+    92%          { opacity: 0.15; }
+}
+@keyframes status-pulse {
+    0%,100% { opacity: 1; }
+    50%     { opacity: 0.4; }
+}
 .hero {
     position: relative;
-    border: 1px solid rgba(0,212,255,0.25);
-    border-radius: 20px;
-    padding: 52px 40px 44px;
+    border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 16px;
+    padding: 56px 40px 48px;
     text-align: center;
     margin-bottom: 28px;
     overflow: hidden;
-    background-color: #0d1520;
+    background-color: #070d18;
     background-image:
+        linear-gradient(rgba(0,212,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.035) 1px, transparent 1px),
         linear-gradient(rgba(0,212,255,0.07) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0,212,255,0.07) 1px, transparent 1px);
-    background-size: 40px 40px;
-    box-shadow: 0 0 80px rgba(0,212,255,0.08);
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    box-shadow: 0 0 100px rgba(0,212,255,0.07), inset 0 0 60px rgba(0,0,0,0.4);
 }
-.hero::before {
-    content: '';
+/* Scanning beam */
+.hero-scan {
     position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 50% 0%, rgba(0,212,255,0.12) 0%, transparent 70%);
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, rgba(0,212,255,0.1) 20%,
+                rgba(0,212,255,0.7) 50%, rgba(0,212,255,0.1) 80%, transparent 100%);
+    animation: scan-beam 4s ease-in-out infinite;
     pointer-events: none;
+}
+/* CAD corner markers */
+.hero-corner {
+    position: absolute;
+    width: 22px; height: 22px;
+    border-color: rgba(0,212,255,0.55);
+    border-style: solid;
+}
+.hc-tl { top:12px; left:12px;  border-width: 2px 0 0 2px; }
+.hc-tr { top:12px; right:12px; border-width: 2px 2px 0 0; }
+.hc-bl { bottom:12px; left:12px;  border-width: 0 0 2px 2px; }
+.hc-br { bottom:12px; right:12px; border-width: 0 2px 2px 0; }
+/* Crosshair target */
+.hero-target {
+    position: absolute;
+    left: 6%;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 90px; height: 90px;
+    display: flex; align-items: center; justify-content: center;
+}
+.ht-ring1 {
+    position: absolute;
+    width: 90px; height: 90px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,212,255,0.5);
+    animation: pulse-ring 2.5s ease-in-out infinite;
+}
+.ht-ring2 {
+    position: absolute;
+    width: 58px; height: 58px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,212,255,0.35);
+    animation: pulse-ring2 2.5s ease-in-out infinite 0.4s;
+}
+.ht-cross-h {
+    position: absolute;
+    width: 90px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.5), transparent);
+}
+.ht-cross-v {
+    position: absolute;
+    height: 90px; width: 1px;
+    background: linear-gradient(180deg, transparent, rgba(0,212,255,0.5), transparent);
+}
+.ht-dot {
+    position: absolute;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #00D4FF;
+    box-shadow: 0 0 8px #00D4FF;
+}
+/* Coordinate readout */
+.hero-coords {
+    position: absolute;
+    right: 18px; bottom: 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    color: rgba(0,212,255,0.6);
+    text-align: right;
+    line-height: 1.6;
+    animation: coord-blink 5s infinite;
+    letter-spacing: 0.5px;
+}
+/* Status bar */
+.hero-status {
+    position: absolute;
+    left: 18px; bottom: 14px;
+    display: flex; gap: 16px;
+    font-size: 0.65rem;
+    letter-spacing: 1.5px;
+    font-family: 'Orbitron', sans-serif;
+    color: rgba(0,212,255,0.45);
+}
+.hs-dot {
+    color: #00ff88;
+    animation: status-pulse 2s infinite;
+    margin-left: 4px;
 }
 .hero-title {
     font-family: 'Orbitron', sans-serif !important;
-    font-size: 3.2rem;
+    font-size: 3.4rem;
     font-weight: 900;
     color: #ffffff;
-    letter-spacing: 6px;
+    letter-spacing: 8px;
     text-shadow:
-        0 0 20px rgba(0,212,255,0.9),
-        0 0 40px rgba(0,212,255,0.6),
-        0 0 80px rgba(0,212,255,0.3);
+        0 0 15px rgba(0,212,255,1),
+        0 0 35px rgba(0,212,255,0.7),
+        0 0 70px rgba(0,212,255,0.35),
+        0 0 120px rgba(0,212,255,0.15);
     margin-bottom: 14px;
+    position: relative;
 }
 .hero-sub {
-    color: #90e0ef;
-    font-size: 1.05rem;
-    letter-spacing: 1px;
-    opacity: 0.9;
+    color: rgba(144,224,239,0.85);
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    position: relative;
 }
 
 /* Metrics */
@@ -165,8 +274,30 @@ hr { border-color: rgba(0,212,255,0.15) !important; }
 # ── Hero ───────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="hero">
+    <div class="hero-scan"></div>
+    <div class="hero-corner hc-tl"></div>
+    <div class="hero-corner hc-tr"></div>
+    <div class="hero-corner hc-bl"></div>
+    <div class="hero-corner hc-br"></div>
+    <div class="hero-target">
+        <div class="ht-ring1"></div>
+        <div class="ht-ring2"></div>
+        <div class="ht-cross-h"></div>
+        <div class="ht-cross-v"></div>
+        <div class="ht-dot"></div>
+    </div>
     <div class="hero-title">SURVEYPOINT</div>
     <div class="hero-sub">מערכת חכמה לניתוח תיקי חישובים הנדסיים | אוניברסיטת אריאל</div>
+    <div class="hero-coords">
+        Y: 151,650.99<br>
+        X: 243,464.96<br>
+        &Delta;: &plusmn;0.003m
+    </div>
+    <div class="hero-status">
+        <span><span class="hs-dot">&#9679;</span> ACTIVE</span>
+        <span>GEMINI AI</span>
+        <span>ITM GRID</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
