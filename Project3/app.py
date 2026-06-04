@@ -211,7 +211,17 @@ def run_anomaly(df, contamination=0.05):
     df["סטטוס"] = df["pred"].map({1: "✅ תקין", -1: "⚠️ חשוד"})
     return df
 
+def load_api_key():
+    key_file = os.path.join(ROOT_DIR, "key.txt")
+    if os.path.exists(key_file):
+        with open(key_file, encoding="utf-8") as f:
+            k = f.read().strip()
+        if k:
+            return k
+    return None
+
 DATASETS  = get_datasets()
+AUTO_KEY  = load_api_key()
 COLORS    = ["#00D4FF", "#ffd700", "#00ff88", "#ff6b6b"]
 PLOT_STYLE = dict(
     plot_bgcolor="rgba(10,14,26,0.95)",
@@ -298,16 +308,20 @@ with tab_ocr:
     st.markdown("העלי תיק חישובים (TIF/PDF) לחילוץ קואורדינטות אוטומטי.")
     st.markdown("---")
 
-    st.markdown("### 🔑 Gemini API Key")
-    gemini_key = st.text_input(
-        "הכניסי Gemini API Key:",
-        type="password",
-        placeholder="AQ. ... או AIzaSy...",
-        key="gemini_key",
-        help="קבלי Key חינם ב: aistudio.google.com/app/apikey"
-    )
-    if gemini_key:
-        st.success("✅ Key הוכנס — מוכן לחילוץ")
+    if AUTO_KEY:
+        gemini_key = AUTO_KEY
+        st.success("✅ Gemini API Key נטען אוטומטית")
+    else:
+        with st.expander("🔑 Gemini API Key", expanded=True):
+            gemini_key = st.text_input(
+                "הכניסי Gemini API Key:",
+                type="password",
+                placeholder="AQ. ... או AIzaSy...",
+                key="gemini_key",
+                help="או צרי קובץ key.txt בתיקיית הפרויקט"
+            )
+            if not gemini_key:
+                st.caption("💡 ניתן גם ליצור קובץ key.txt עם ה-Key בתיקיית הפרויקט")
 
     st.markdown("---")
 
