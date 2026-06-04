@@ -554,12 +554,12 @@ if "ocr_df" not in st.session_state:
 
 # ברירות מחדל Data1 (מדף שער התיק)
 if st.session_state.get("_demo_mode") and not st.session_state.get("_meta_set"):
-    st.session_state["tik_num"]   = "9546"
-    st.session_state["tlr_num"]   = "989-986"
-    st.session_state["tlr_year"]  = "2006"
-    st.session_state["gush"]      = "3893"
-    st.session_state["helka"]     = ""
-    st.session_state["tik_chish"] = "525"
+    st.session_state["tik_num"]   = "362"
+    st.session_state["tlr_num"]   = "8/11-82"
+    st.session_state["tlr_year"]  = "1955"
+    st.session_state["gush"]      = "11200"
+    st.session_state["helka"]     = "1"
+    st.session_state["tik_chish"] = "105/55"
     st.session_state["_meta_set"] = True
 PLOT_STYLE = dict(
     plot_bgcolor="rgba(10,14,26,0.95)",
