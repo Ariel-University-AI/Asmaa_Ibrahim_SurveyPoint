@@ -129,16 +129,24 @@ hr { border-color: rgba(0,212,255,0.15) !important; }
     border-radius: 12px !important;
     padding: 16px !important;
 }
-[data-testid="stFileUploader"] button,
-[data-testid="stFileUploaderDropzone"] button,
-button[kind="secondary"] {
+/* Fix Uploadpload RTL duplication bug */
+[data-testid="stFileUploaderDropzone"] {
     direction: ltr !important;
-    unicode-bidi: embed !important;
 }
-[data-testid="stFileUploader"] button p,
-[data-testid="stFileUploader"] button span {
+[data-testid="stFileUploaderDropzone"] > div > p {
+    direction: rtl !important;
+    text-align: center !important;
+}
+[data-testid="stFileUploaderDropzone"] button {
     direction: ltr !important;
-    unicode-bidi: embed !important;
+    unicode-bidi: isolate !important;
+    overflow: hidden !important;
+}
+[data-testid="stFileUploaderDropzone"] button p,
+[data-testid="stFileUploaderDropzone"] button span,
+[data-testid="stFileUploaderDropzone"] button div {
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
 }
 .stTextInput input {
     background: rgba(13,27,42,0.8) !important;
