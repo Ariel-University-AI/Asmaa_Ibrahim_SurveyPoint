@@ -674,6 +674,7 @@ def extract_with_gemini(
     BATCH = 5
     results = {}
 
+    # ── עובר ראשון ────────────────────────────────────────────────────────────
     for batch_start in range(0, n_pages, BATCH):
         batch = list(range(batch_start, min(batch_start + BATCH, n_pages)))
         bt0 = time.time()
@@ -689,6 +690,27 @@ def extract_with_gemini(
         print(f"-- Batch {batch_start//BATCH+1} done: {time.time()-bt0:.1f}s --")
         if batch_start + BATCH < n_pages:
             time.sleep(1)
+
+    # ── Adaptive Double-Pass: ריצה שנייה לדפים חשודים בלבד ───────────────────
+    # קריטריון: דף שהחזיר 0 נקודות (ואינו ריק) → ריצה שנייה
+    retry_pages = [p for p in range(n_pages)
+                   if len(results.get(p, [])) == 0 and pages_b64.get(p) is not None]
+    if retry_pages:
+        print(f"\n-- Adaptive retry: {len(retry_pages)} pages with 0 results --")
+        time.sleep(2)
+        retry_batch = []
+        for p in retry_pages:
+            retry_batch.append(p)
+            if len(retry_batch) == BATCH or p == retry_pages[-1]:
+                with ThreadPoolExecutor(max_workers=BATCH) as pool:
+                    futures = {pool.submit(_send_page, pp): pp for pp in retry_batch}
+                    for fut in as_completed(futures):
+                        pp, pts = fut.result()
+                        if pts:   # רק אם מצא משהו בריצה השנייה
+                            results[pp] = pts
+                            print(f"  Retry P{pp+1}: {len(pts)} pts recovered")
+                retry_batch = []
+                time.sleep(1)
 
     # אסוף בסדר עמודים
     all_points = [pt for p in range(n_pages) for pt in results.get(p, [])]
