@@ -245,24 +245,27 @@ hr { border-color: rgba(0,212,255,0.15) !important; }
 [data-testid="stFileUploaderDropzone"] small {
     color: #ffffff !important;
 }
-/* Fix Uploadpload — hide original text, inject clean text */
+/* Fix Uploadpload — hide all button children, show clean ::after */
 [data-testid="stFileUploaderDropzone"] button {
-    font-size: 0 !important;
-    color: transparent !important;
-    direction: ltr !important;
-    min-width: 110px !important;
     position: relative !important;
+    min-width: 120px !important;
+    direction: ltr !important;
+}
+[data-testid="stFileUploaderDropzone"] button * {
+    visibility: hidden !important;
 }
 [data-testid="stFileUploaderDropzone"] button::after {
     content: "Browse files";
+    visibility: visible !important;
+    position: absolute !important;
+    inset: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     font-size: 14px !important;
-    color: #31333F !important;
     font-family: 'Heebo', sans-serif !important;
     direction: ltr !important;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
+    white-space: nowrap !important;
 }
 .stTextInput input {
     background: rgba(13,27,42,0.8) !important;
