@@ -774,7 +774,7 @@ with tab_detect:
     st.markdown("## 🤖 זיהוי חריגים")
     st.markdown("---")
 
-    with st.expander("ℹ️ כיצד עובד זיהוי החריגים?", expanded=False):
+    with st.expander("כיצד עובד זיהוי החריגים?", expanded=False):
         st.markdown("""
 **Isolation Forest** — אלגוריתם בינה מלאכותית לזיהוי נקודות חריגות:
 
