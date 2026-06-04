@@ -565,18 +565,33 @@ def show_anomaly_chart(df_res):
     )
     st.plotly_chart(fig, use_container_width=True, key=ck())
 
-    if n_bad > 0:
-        st.markdown("### ⚠️ נקודות חשודות")
-        df_bad_show = df_bad[["שם נקודה", "Y", "X"]].reset_index(drop=True)
-        st.dataframe(df_bad_show, use_container_width=True,
-                     column_config={
-                         "Y": st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
-                         "X": st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
-                     })
-        csv_bad = df_bad_show.to_csv(index=False).encode("utf-8-sig")
-        st.download_button("⬇️ הורד נקודות חשודות — CSV", data=csv_bad,
-                           file_name="suspicious_points.csv",
+    # טבלה מלאה עם עמודת סטטוס
+    st.markdown("### 📋 טבלת כל הקואורדינטות")
+    df_full = df_res[["שם נקודה", "Y", "X", "סטטוס"]].copy().reset_index(drop=True)
+    st.dataframe(
+        df_full,
+        use_container_width=True,
+        height=400,
+        column_config={
+            "Y":      st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
+            "X":      st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
+            "סטטוס": st.column_config.TextColumn("סטטוס"),
+        },
+        hide_index=True,
+    )
+
+    col_dl1, col_dl2 = st.columns(2)
+    with col_dl1:
+        csv_all = df_full.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("⬇️ הורד כל הנקודות — CSV", data=csv_all,
+                           file_name="all_points_with_status.csv",
                            mime="text/csv", key=ck())
+    if n_bad > 0:
+        with col_dl2:
+            csv_bad = df_bad[["שם נקודה","Y","X"]].to_csv(index=False).encode("utf-8-sig")
+            st.download_button("⬇️ הורד חשודות בלבד — CSV", data=csv_bad,
+                               file_name="suspicious_points.csv",
+                               mime="text/csv", key=ck())
 
     out = io.BytesIO()
     df_res.drop(columns=["pred"]).to_excel(out, index=False)
