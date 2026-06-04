@@ -124,6 +124,24 @@ print(f"Wrong coords:{len(bad)}")
 print(f"Missing:     {len(only_orig)} -- {sorted(only_orig)}")
 print(f"Extra:       {len(only_ext)}")
 
+# ── דיווח טעויות מפורט ────────────────────────────────────────────────────────
+if bad:
+    print(f"\n{'─'*60}")
+    print(f"ERRORS ({len(bad)} wrong coordinates) -- TOL={TOL}m:")
+    print(f"{'Name':>8}  {'Y_ref':>12}  {'X_ref':>12}  {'Y_ext':>12}  {'X_ext':>12}  {'dY':>8}  {'dX':>8}")
+    for name in sorted(bad):
+        yo, xo = orig_dict[name]
+        ye, xe = ext_dict[name]
+        dy, dx = yo-ye, xo-xe
+        flag = "Y?" if abs(dy) > abs(dx) else "X?" if abs(dx) > abs(dy) else "YX?"
+        print(f"{name:>8}  {yo:>12.3f}  {xo:>12.3f}  {ye:>12.3f}  {xe:>12.3f}  {dy:>+8.3f}  {dx:>+8.3f}  {flag}")
+
+if only_orig:
+    print(f"\nMISSING points (not extracted at all):")
+    for name in sorted(only_orig):
+        yo, xo = orig_dict[name]
+        print(f"  {name}: Y={yo:.3f}, X={xo:.3f}")
+
 print(f"\n{'='*40}")
 print(f"SCORE: {len(good)}/{len(orig)} = {len(good)/len(orig)*100:.1f}%")
 print(f"TIME:  {elapsed:.0f} seconds")
