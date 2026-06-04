@@ -537,6 +537,7 @@ def extract_with_gemini(
 - עד 6 תווים בלבד
 - אסור: עברית, סימנים, שמות ארוכים מ-6 תווים
 - הכי חשוב: העתק את שם הנקודה בדיוק כמו שכתוב — כולל אותיות, מספרים וסימנים
+- חובה: קרא כל שורה בטבלה בנפרד — שם הנקודה, Y ו-X חייבים להגיע מאותה שורה בלבד, אסור לערבב ערכים משורות שונות!
 
 פורמטים תקינים של קואורדינטות — רק אחד משניים:
 - 3 ספרות + נקודה עשרונית: 650.99  (רשת מקומית/ישנה)
@@ -573,8 +574,14 @@ def extract_with_gemini(
         if black_ratio < 0.01 or black_ratio > 0.85:
             pages_b64[p] = None
             continue
+        # Resize לפני שליחה — מקסימום 1200px (מאיץ Gemini פי ~2.5)
+        img = src.convert('RGB')
+        max_dim = max(img.size)
+        if max_dim > 1200:
+            ratio = 1200 / max_dim
+            img = img.resize((int(img.width * ratio), int(img.height * ratio)), Image.LANCZOS)
         buf = io.BytesIO()
-        src.convert('RGB').save(buf, format='JPEG', quality=80)
+        img.save(buf, format='JPEG', quality=75)
         pages_b64[p] = base64.b64encode(buf.getvalue()).decode()
 
     done = [0]
