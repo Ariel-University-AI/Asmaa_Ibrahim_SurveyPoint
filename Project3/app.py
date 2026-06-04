@@ -614,7 +614,7 @@ with tab_detect:
         else:
             st.warning("לא נמצאו מערכי נתונים")
     else:
-        up = st.file_uploader("העלי קובץ CSV (שם נקודה, Y, X):",
+        up = st.file_uploader("קובץ CSV (שם נקודה, Y, X):",
                               type=["csv", "CSV"], key="det_csv")
         if up:
             df_input = load_csv(up.read(), is_bytes=True)
