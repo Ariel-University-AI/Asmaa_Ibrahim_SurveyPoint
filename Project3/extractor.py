@@ -636,9 +636,7 @@ def extract_with_gemini(
                                 y = float(str(y)[1:])
                             if 1000 <= x < 10000:
                                 x = float(str(x)[1:])
-                            if not (_is_valid_gemini_coord(y) and _is_valid_gemini_coord(x)):
-                                continue
-                            if name and abs(y - x) > 1:
+                            if name and y > 0 and x > 0 and abs(y - x) > 1:
                                 pts.append({'שם נקודה': name, 'Y': y, 'X': x})
                         except Exception:
                             pass
@@ -650,7 +648,7 @@ def extract_with_gemini(
                 break
         return p, pts
 
-    BATCH = 5
+    BATCH = 1
     results = {}
 
     for batch_start in range(0, n_pages, BATCH):
@@ -681,18 +679,7 @@ def extract_with_gemini(
     df['X'] = pd.to_numeric(df['X'], errors='coerce')
     df = df.dropna(subset=['Y', 'X'])
 
-    # dedup חכם: לכל שם — שמור הקואורדינטה שמופיעה הכי הרבה (voting)
-    best_rows = []
-    for name, group in df.groupby('שם נקודה', sort=False):
-        y_mode = group['Y'].round(1).mode()
-        x_mode = group['X'].round(1).mode()
-        best_y = y_mode.iloc[0] if len(y_mode) else group['Y'].iloc[0]
-        best_x = x_mode.iloc[0] if len(x_mode) else group['X'].iloc[0]
-        mask = (group['Y'].round(1) == round(best_y, 1)) & \
-               (group['X'].round(1) == round(best_x, 1))
-        row = group[mask].iloc[0] if mask.any() else group.iloc[0]
-        best_rows.append({'שם נקודה': name, 'Y': float(row['Y']), 'X': float(row['X'])})
-    return pd.DataFrame(best_rows)
+    return df.drop_duplicates('שם נקודה').reset_index(drop=True)
 
 
 def spatial_match_to_reference(
