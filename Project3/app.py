@@ -3,9 +3,7 @@ import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-import io
-import os
-import glob
+import io, os, glob, json, base64
 from sklearn.ensemble import IsolationForest
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -503,6 +501,44 @@ def load_api_key():
             return k
     return None
 
+def extract_cover_metadata(tif_bytes: bytes, api_key: str) -> dict:
+    """שולח עמוד ראשון של TIF ל-Gemini ומחלץ פרטי תיק חישובים"""
+    import requests, base64, json
+    from PIL import Image as _PIL
+    HDR = {"x-goog-api-key": api_key} if not api_key.startswith("AIzaSy") else {}
+    QP  = f"?key={api_key}" if api_key.startswith("AIzaSy") else ""
+    URL = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"gemini-2.5-flash:generateContent{QP}")
+    try:
+        src = _PIL.open(io.BytesIO(tif_bytes))
+        src.seek(0)
+        buf = io.BytesIO()
+        src.convert("RGB").save(buf, format="JPEG", quality=80)
+        img_b64 = base64.b64encode(buf.getvalue()).decode()
+        PROMPT = """זהו דף שער של תיק חישובים הנדסי ישראלי.
+חלץ את הפרטים הבאים אם הם מופיעים בדף:
+- מספר תיק
+- מספר תל"ר (יכול להיות טווח: 989-986)
+- שנת תל"ר
+- מספר גוש (יכול להיות כמה גושים מופרדים בפסיק)
+- חלקה
+- מספר תיק חישובי / מספר מב"ר
+
+החזר JSON בלבד ללא הסברים:
+{"tik":"","tlr_num":"","tlr_year":"","gush":"","helka":"","tik_chish":""}"""
+        resp = requests.post(URL, headers=HDR, timeout=30, json={"contents": [{"parts": [
+            {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
+            {"text": PROMPT}
+        ]}]})
+        resp.raise_for_status()
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        s, e = text.find("{"), text.rfind("}")
+        if s != -1 and e > s:
+            return json.loads(text[s:e+1])
+    except Exception:
+        pass
+    return {}
+
 DATASETS  = get_datasets()
 AUTO_KEY  = load_api_key()
 COLORS    = ["#00D4FF", "#ffd700", "#00ff88", "#ff6b6b"]
@@ -515,6 +551,16 @@ if "ocr_df" not in st.session_state:
         if _df is not None:
             st.session_state["ocr_df"] = _df
             st.session_state["_demo_mode"] = True
+
+# ברירות מחדל Data1 (מדף שער התיק)
+if st.session_state.get("_demo_mode") and not st.session_state.get("_meta_set"):
+    st.session_state["tik_num"]   = "9546"
+    st.session_state["tlr_num"]   = "989-986"
+    st.session_state["tlr_year"]  = "2006"
+    st.session_state["gush"]      = "3893"
+    st.session_state["helka"]     = ""
+    st.session_state["tik_chish"] = "525"
+    st.session_state["_meta_set"] = True
 PLOT_STYLE = dict(
     plot_bgcolor="rgba(10,14,26,0.95)",
     paper_bgcolor="rgba(0,0,0,0)",
@@ -708,6 +754,21 @@ with tab_ocr:
             core_cols = ["שם נקודה", "Y", "X"]
             ocr_core = df_ocr[core_cols] if all(c in df_ocr.columns for c in core_cols) else df_ocr
             st.session_state["ocr_df"] = ocr_core if len(ocr_core) > 0 else None
+            st.session_state["_demo_mode"] = False
+
+            # חילוץ פרטי תיק מדף שער אוטומטי
+            if gemini_key and len(df_ocr) > 0 and not fname.endswith(".pdf"):
+                with st.spinner("חולץ פרטי תיק מדף שער..."):
+                    _meta = extract_cover_metadata(file_bytes, gemini_key)
+                if _meta:
+                    if _meta.get("tik"):      st.session_state["tik_num"]   = _meta["tik"]
+                    if _meta.get("tlr_num"):  st.session_state["tlr_num"]   = _meta["tlr_num"]
+                    if _meta.get("tlr_year"): st.session_state["tlr_year"]  = _meta["tlr_year"]
+                    if _meta.get("gush"):     st.session_state["gush"]      = _meta["gush"]
+                    if _meta.get("helka"):    st.session_state["helka"]     = _meta["helka"]
+                    if _meta.get("tik_chish"):st.session_state["tik_chish"] = _meta["tik_chish"]
+                    st.session_state["_meta_set"] = True
+                    st.success("📋 פרטי תיק חולצו אוטומטית — עבור לסקירה כללית")
 
             if len(df_ocr) == 0:
                 st.warning("לא נמצאו קואורדינטות בקובץ זה.")
