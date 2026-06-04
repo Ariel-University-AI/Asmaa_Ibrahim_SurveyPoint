@@ -639,11 +639,6 @@ def show_anomaly_chart(df_res):
                                file_name="suspicious_points.csv",
                                mime="text/csv", key=ck())
 
-    out = io.BytesIO()
-    df_res.drop(columns=["pred"]).to_excel(out, index=False)
-    st.download_button("⬇️ הורד Excel — תוצאות מלאות", data=out.getvalue(),
-                       file_name="SurveyPoint_analysis.xlsx",
-                       mime="application/vnd.ms-excel", key=ck())
 
 # ── לשוניות ───────────────────────────────────────────────────────────────────
 tab_ocr, tab_detect, tab_eda, tab_home = st.tabs([
