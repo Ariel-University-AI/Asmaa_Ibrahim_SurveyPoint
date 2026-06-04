@@ -674,19 +674,25 @@ with tab_home:
 
     # ── פרטי תיק חישובים ──────────────────────────────────────────────────────
     st.markdown("### 📋 פרטי תיק חישובים")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: tik_num = st.text_input("מספר תיק חישובי", key="tik_num", placeholder="למשל: 2024-15")
-    with c2: gush    = st.text_input("גוש",              key="gush",    placeholder="למשל: 6719")
-    with c3: helka   = st.text_input("חלקה",             key="helka",   placeholder="למשל: 42")
-    with c4: year    = st.text_input("שנת התיק",         key="year",    placeholder="למשל: 1982")
+    r1c1, r1c2, r1c3 = st.columns(3)
+    with r1c1: tik_num  = st.text_input("מספר תיק",          key="tik_num",  placeholder="9546")
+    with r1c2: tlr_num  = st.text_input('מספר תל"ר',         key="tlr_num",  placeholder="989-986")
+    with r1c3: tlr_year = st.text_input('שנת תל"ר',          key="tlr_year", placeholder="2006")
 
-    if any([tik_num, gush, helka, year]):
+    r2c1, r2c2, r2c3 = st.columns(3)
+    with r2c1: gush      = st.text_input("גוש",               key="gush",     placeholder="3893")
+    with r2c2: helka     = st.text_input("חלקה",              key="helka",    placeholder="")
+    with r2c3: tik_chish = st.text_input("מספר תיק חישובי",   key="tik_chish",placeholder="525")
+
+    fields = {"📁 מספר תיק": tik_num, '📋 מספר תל"ר': tlr_num,
+              '📅 שנת תל"ר': tlr_year, "🗺️ גוש": gush,
+              "📌 חלקה": helka, "🔢 מספר תיק חישובי": tik_chish}
+    filled = {k: v for k, v in fields.items() if v}
+    if filled:
         st.markdown("---")
-        m1, m2, m3, m4 = st.columns(4)
-        if tik_num: m1.metric("📁 מספר תיק", tik_num)
-        if gush:    m2.metric("🗺️ גוש",        gush)
-        if helka:   m3.metric("📌 חלקה",       helka)
-        if year:    m4.metric("📅 שנת התיק",   year)
+        mcols = st.columns(len(filled))
+        for i, (label, val) in enumerate(filled.items()):
+            mcols[i].metric(label, val)
 
     st.markdown("---")
 
