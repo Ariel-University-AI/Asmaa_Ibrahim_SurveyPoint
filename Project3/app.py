@@ -129,11 +129,16 @@ hr { border-color: rgba(0,212,255,0.15) !important; }
     border-radius: 12px !important;
     padding: 16px !important;
 }
-[data-testid="stFileUploader"] button {
+[data-testid="stFileUploader"] button,
+[data-testid="stFileUploaderDropzone"] button,
+button[kind="secondary"] {
     direction: ltr !important;
+    unicode-bidi: embed !important;
 }
-[data-testid="stFileUploaderDropzone"] {
-    direction: rtl !important;
+[data-testid="stFileUploader"] button p,
+[data-testid="stFileUploader"] button span {
+    direction: ltr !important;
+    unicode-bidi: embed !important;
 }
 .stTextInput input {
     background: rgba(13,27,42,0.8) !important;
