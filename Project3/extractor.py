@@ -650,8 +650,8 @@ def extract_with_gemini(
                 break
         return p, pts
 
-    # עבד ב-batches של 5 במקביל
-    BATCH = 5
+    # עבד ב-batches של 8 במקביל
+    BATCH = 8
     results = {}
 
     for batch_start in range(0, n_pages, BATCH):
