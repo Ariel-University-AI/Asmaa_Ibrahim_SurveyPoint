@@ -518,9 +518,17 @@ def normalize_coords(df):
     return df
 
 def run_anomaly(df, contamination=0.05):
-    df = normalize_coords(df)   # תיקון Y/X לפני כל ניתוח
+    df = normalize_coords(df).copy()
+    # סנן outliers קיצוניים לפני IsolationForest (מחוץ ל-4 סטיות תקן)
+    for col in ["Y", "X"]:
+        m, s = df[col].mean(), df[col].std()
+        if s > 0:
+            df = df[abs(df[col] - m) < 4 * s]
+    if len(df) < 5:
+        df["pred"] = 1
+        df["סטטוס"] = "תקין ✅"
+        return df
     model = IsolationForest(contamination=contamination, random_state=42, n_estimators=100)
-    df = df.copy()
     df["pred"] = model.fit_predict(df[["Y", "X"]])
     df["סטטוס"] = df["pred"].map({1: "תקין ✅", -1: "חשוד 🟡"})
     return df
@@ -643,7 +651,7 @@ def show_anomaly_chart(df_res):
     fig.update_layout(**PLOT_STYLE, height=500, showlegend=False,
         xaxis=dict(title="X — מזרח", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
         yaxis=dict(title="Y — צפון", gridcolor="rgba(0,212,255,0.1)", zeroline=False,
-                   scaleanchor="x", scaleratio=1),
+        ),
     )
     st.plotly_chart(fig, use_container_width=True, key=ck())
     st.markdown(
@@ -825,8 +833,7 @@ with tab_ocr:
                     fig_o.update_traces(marker=dict(size=7))
                     fig_o.update_layout(**PLOT_STYLE, height=420,
                         xaxis=dict(title="X — מזרח", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
-                        yaxis=dict(title="Y — צפון", gridcolor="rgba(0,212,255,0.1)", zeroline=False,
-                                   scaleanchor="x", scaleratio=1),
+                        yaxis=dict(title="Y — צפון", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
                     )
                     st.plotly_chart(fig_o, use_container_width=True, key=ck())
 
@@ -936,8 +943,7 @@ with tab_eda:
         fig_sc.update_traces(marker=dict(size=6))
         fig_sc.update_layout(**PLOT_STYLE, height=420,
             xaxis=dict(title="X — מזרח", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
-            yaxis=dict(title="Y — צפון", gridcolor="rgba(0,212,255,0.1)", zeroline=False,
-                       scaleanchor="x", scaleratio=1),
+            yaxis=dict(title="Y — צפון", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
         )
         st.plotly_chart(fig_sc, use_container_width=True, key=ck())
 
