@@ -206,6 +206,67 @@ div[data-testid="metric-container"] {
     color: #00D4FF !important;
 }
 
+/* ══ Upload Scanner Terminal ══ */
+@keyframes scan-doc {
+    0%   { top: 0%; opacity: 0; }
+    5%   { opacity: 0.8; }
+    95%  { opacity: 0.8; }
+    100% { top: 100%; opacity: 0; }
+}
+@keyframes blink-cursor {
+    0%,100% { opacity: 1; } 50% { opacity: 0; }
+}
+.scan-terminal {
+    background: linear-gradient(160deg, #070d18 0%, #0a1220 100%);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 14px;
+    padding: 28px 32px 20px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+}
+.scan-terminal::before {
+    content: '';
+    position: absolute; left: 0; right: 0;
+    height: 1.5px;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.6), transparent);
+    animation: scan-doc 3.5s ease-in-out infinite;
+}
+.st-corner { position: absolute; width: 14px; height: 14px; border-color: rgba(0,212,255,0.6); border-style: solid; }
+.st-tl { top: 8px; left: 8px;  border-width: 2px 0 0 2px; }
+.st-tr { top: 8px; right: 8px; border-width: 2px 2px 0 0; }
+.st-bl { bottom: 8px; left: 8px;  border-width: 0 0 2px 2px; }
+.st-br { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+.st-header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 6px;
+}
+.st-icon {
+    font-size: 2.2rem;
+    filter: drop-shadow(0 0 8px rgba(0,212,255,0.6));
+}
+.st-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    color: rgba(0,212,255,0.5);
+    text-transform: uppercase;
+}
+.st-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 2px;
+}
+.st-formats {
+    font-size: 0.78rem;
+    color: rgba(0,212,255,0.45);
+    letter-spacing: 2px;
+    margin-top: 2px;
+}
+.st-cursor { animation: blink-cursor 1s infinite; }
+
 /* Buttons */
 .stButton > button {
     background: linear-gradient(135deg, #00D4FF, #0077b6) !important;
@@ -466,11 +527,26 @@ with tab_ocr:
 
     st.markdown("---")
 
-    st.markdown("### 📂 קובץ תיק חישובים")
+    st.markdown("""
+<div class="scan-terminal">
+    <div class="st-corner st-tl"></div><div class="st-corner st-tr"></div>
+    <div class="st-corner st-bl"></div><div class="st-corner st-br"></div>
+    <div class="st-header">
+        <div class="st-icon">📐</div>
+        <div>
+            <div class="st-label">DOCUMENT INGESTION TERMINAL</div>
+            <div class="st-title">SCAN CALCULATION FILE<span class="st-cursor">_</span></div>
+            <div class="st-formats">TIF &nbsp;•&nbsp; TIFF &nbsp;•&nbsp; PDF &nbsp;|&nbsp; MAX 200MB</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
     uploaded = st.file_uploader(
         "גרירת קובץ TIF/PDF לכאן",
         type=["tif", "TIF", "tiff", "TIFF", "pdf", "PDF"],
         key="ocr_upload",
+        label_visibility="collapsed",
     )
 
     if uploaded:
