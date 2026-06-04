@@ -138,6 +138,11 @@ def _is_coord(v: float) -> bool:
     return (50 <= v <= 10_000) or (100_000 <= v <= 900_000)
 
 
+def _is_valid_gemini_coord(v: float) -> bool:
+    """פורמט תקין: 3 ספרות עשרוני (100-999) או 6 ספרות עשרוני (100000-999999)"""
+    return (100.0 <= v < 1000.0) or (100_000.0 <= v < 1_000_000.0)
+
+
 def _clean_name(t: str) -> str:
     return re.sub(r'[^0-9A-Za-z]', '', t.strip())
 
@@ -497,15 +502,14 @@ def extract_with_gemini(
     progress_cb=None,
 ) -> pd.DataFrame:
     """
-    שולח כל דף TIF ל-Gemini אחד-אחד, מחזיר כל הקואורדינטות.
+    שולח 5 דפים במקביל ל-Gemini, מחזיר קואורדינטות בסדר עמודים.
     """
     import requests, base64, json, time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    # Header לפי פורמט Key
     HDR = {"x-goog-api-key": api_key} if not api_key.startswith("AIzaSy") else {}
     QP  = f"?key={api_key}" if api_key.startswith("AIzaSy") else ""
 
-    # מצא מודל זמין — lite קודם (מכסה גבוהה)
     try:
         lst = requests.get(
             f"https://generativelanguage.googleapis.com/v1beta/models{QP}",
@@ -514,11 +518,10 @@ def extract_with_gemini(
         avail = [m['name'].split('/')[-1] for m in lst.json().get('models', [])
                  if 'generateContent' in m.get('supportedGenerationMethods', [])
                  and 'flash' in m['name']]
-        # בחר 2.5-flash (מודל חדש עם billing)
         v25 = [m for m in avail if '2.5-flash' in m and 'pro' not in m]
         GEMINI_MODEL = (v25 or avail or ["gemini-2.5-flash"])[0]
     except Exception:
-        GEMINI_MODEL = "gemini-2.0-flash-lite-001"
+        GEMINI_MODEL = "gemini-2.5-flash"
 
     API_URL = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                f"{GEMINI_MODEL}:generateContent{QP}")
@@ -530,15 +533,18 @@ def extract_with_gemini(
 
 כללי שמות נקודה תקינים:
 - מספרים: 1, 15, 4318
-- מספר + אות: 15A, 3B, 1240G, 457M
+- מספר + אות: 15A, 3B, 457M
 - עד 6 תווים בלבד
-- אסור: עברית, סימנים & ( ) = *, שמות ארוכים מ-6 תווים
+- אסור: עברית, סימנים, שמות ארוכים מ-6 תווים
+- הכי חשוב: העתק את שם הנקודה בדיוק כמו שכתוב — כולל אותיות, מספרים וסימנים
 
-סוגי קואורדינטות בישראל:
-- רשת ישראל הישנה (לפני 1994): Y ו-X בטווח 0–300,000
-- ITM חדש (אחרי 1994): Y בטווח 100,000–900,000, X בטווח 0–300,000
-- חישובים מקומיים: ערכים קטנים (עשרות עד אלפים)
-- זהה לפי הערכים שבדף ממש — אל תנחש
+פורמטים תקינים של קואורדינטות — רק אחד משניים:
+- 3 ספרות + נקודה עשרונית: 650.99  (רשת מקומית/ישנה)
+- 6 ספרות + נקודה עשרונית: 151650.99  (ITM/כללי ישראל)
+- אסור בהחלט: 2 ספרות, 4 ספרות, 5 ספרות — אלה שגיאות OCR!
+
+כלל קרבה: כל הנקודות בדף הן מאותו גוש — Y וX של כל הנקודות חייבים להיות קרובים זה לזה (הפרש מקסימלי: 500 יחידות). אם נקודה נראית רחוקה מהשאר — תחזיר אותה בכל זאת, המערכת תסנן אוטומטית.
+אם קואורדינטה לא ברורה — הערך אותה לפי הנקודות הסמוכות בטבלה.
 
 טבלאות שיש לחפש:
 - חשוב מצולע (traverse): עמודות Y ו-X בצד ימין
@@ -551,37 +557,33 @@ def extract_with_gemini(
 - ערכים שליליים
 - שורות עם מספרי ביניים בלבד (ΔY, ΔX)
 
-העתק ערכים בדיוק כמו שכתוב. אל תמציא.
 החזר JSON בלבד: [{"name":"שם","Y":0.0,"X":0.0}, ...]
 אין קואורדינטות בדף זה → החזר: []"""
 
-    # פתח TIF וספור עמודים
+    # טען כל הדפים לזיכרון (PIL לא thread-safe ל-seek)
     src = Image.open(io.BytesIO(tif_bytes))
     n_pages = getattr(src, 'n_frames', 1)
     print(f"TIF: {n_pages} pages")
 
-    all_points = []
-    processed = 0
-
+    pages_b64 = {}
     for p in range(n_pages):
         src.seek(p)
-
-        # בדיקת תוכן פשוטה
         arr = np.array(src.convert('L'))
         black_ratio = (arr < 128).mean()
         if black_ratio < 0.01 or black_ratio > 0.85:
-            print(f"P{p+1}: skip (black={black_ratio:.2f})")
-            if progress_cb:
-                progress_cb(p + 1, n_pages)
+            pages_b64[p] = None
             continue
-
-        # המר לJPEG קטן
         buf = io.BytesIO()
         src.convert('RGB').save(buf, format='JPEG', quality=80)
-        img_b64 = base64.b64encode(buf.getvalue()).decode()
-        print(f"P{p+1}: sending ({len(buf.getvalue())//1024}KB)...")
+        pages_b64[p] = base64.b64encode(buf.getvalue()).decode()
 
-        # שלח לGemini
+    done = [0]
+
+    def _send_page(p):
+        img_b64 = pages_b64.get(p)
+        if img_b64 is None:
+            return p, []
+
         payload = {"contents": [{"parts": [
             {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
             {"text": PROMPT}
@@ -597,57 +599,60 @@ def extract_with_gemini(
                     time.sleep(wait)
                     continue
                 resp.raise_for_status()
-                text = resp.json()['candidates'][0]['content']['parts'][0]['text']
-                s, e = text.find('['), text.rfind(']')
+                raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
+                s, e = raw.find('['), raw.rfind(']')
                 if s != -1 and e > s:
-                    parsed = json.loads(text[s:e+1])
-                    for item in parsed:
+                    for item in json.loads(raw[s:e+1]):
                         try:
                             name = str(
                                 item.get('name') or item.get('nome') or
                                 item.get('שם') or item.get('point') or ''
                             ).strip()
-
-                            # תיקון 1 — סנן שמות שגויים
-                            # שם תקין: עד 6 תווים, רק ספרות+אותיות לטיניות
-                            import re as _re
                             if not name or len(name) > 6:
                                 continue
-                            if not _re.match(r'^[0-9A-Za-z]{1,6}$', name):
+                            if not re.match(r'^[0-9A-Za-z]{1,6}$', name):
                                 continue
-
                             y = float(str(item.get('Y', item.get('y', 0))).replace(',', '.'))
                             x = float(str(item.get('X', item.get('x', 0))).replace(',', '.'))
-
-                            # תיקון 2 — הסר ספרה מיותרת בקואורדינטות מקומיות
-                            # אם הערך בין 1000-9999 ולא ITM → הסר ספרה ראשונה
+                            # תיקון: 4 ספרות → הסר ספרה ראשונה (שגיאת OCR נפוצה)
                             if 1000 <= y < 10000:
                                 y = float(str(y)[1:])
                             if 1000 <= x < 10000:
                                 x = float(str(x)[1:])
-
-                            # סנן ערכי סיכום (Y≈X) וערכים אפס
-                            if name and y > 0 and x > 0 and abs(y - x) > 1:
+                            # סינון פורמט: רק 3 ספרות (100-999) או 6 ספרות (100000-999999)
+                            if not (_is_valid_gemini_coord(y) and _is_valid_gemini_coord(x)):
+                                continue
+                            if name and abs(y - x) > 1:
                                 pts.append({'שם נקודה': name, 'Y': y, 'X': x})
                         except Exception:
                             pass
-                print(f"P{p+1}: {len(pts)} pts found")
+                print(f"P{p+1}: {len(pts)} pts")
                 break
             except Exception as ex:
                 print(f"P{p+1} err: {ex}")
                 break
+        return p, pts
 
-        all_points.extend(pts)
-        processed += 1
+    # עבד ב-batches של 5 במקביל
+    BATCH = 5
+    results = {}
 
-        if progress_cb:
-            progress_cb(p + 1, n_pages)
+    for batch_start in range(0, n_pages, BATCH):
+        batch = list(range(batch_start, min(batch_start + BATCH, n_pages)))
+        with ThreadPoolExecutor(max_workers=BATCH) as pool:
+            futures = {pool.submit(_send_page, p): p for p in batch}
+            for fut in as_completed(futures):
+                p, pts = fut.result()
+                results[p] = pts
+                done[0] += 1
+                if progress_cb:
+                    progress_cb(done[0], n_pages)
+        if batch_start + BATCH < n_pages:
+            time.sleep(1)
 
-        # המתן בין בקשות
-        if p < n_pages - 1:
-            time.sleep(4)
-
-    print(f"Done: {len(all_points)} total points from {processed} pages")
+    # אסוף בסדר עמודים
+    all_points = [pt for p in range(n_pages) for pt in results.get(p, [])]
+    print(f"Done: {len(all_points)} total points")
 
     if not all_points:
         return pd.DataFrame(columns=['שם נקודה', 'Y', 'X'])
@@ -657,6 +662,78 @@ def extract_with_gemini(
     df['X'] = pd.to_numeric(df['X'], errors='coerce')
     df = df.dropna(subset=['Y', 'X'])
     return df.drop_duplicates('שם נקודה').reset_index(drop=True)
+
+
+def spatial_match_to_reference(
+    extracted_df: pd.DataFrame,
+    reference_df: pd.DataFrame,
+    threshold: float = 2.0,
+) -> pd.DataFrame:
+    """
+    מתאים קואורדינטות מחולצות לנקודות ייחוס לפי מרחק מרחבי.
+    מתקן drift: שם שגוי שקיבל קואורדינטה נכונה → מקבל את השם הנכון.
+
+    extracted_df: [שם נקודה, Y, X] — קואורדינטות מקומיות או מלאות
+    reference_df: [שם נקודה, Y, X] — קואורדינטות מלאות (ייחוס)
+    threshold:    מרחק מקסימלי (מטר) להתאמה
+    """
+    if extracted_df.empty or reference_df.empty:
+        return extracted_df
+
+    ref = reference_df.copy()
+    ref_name_col = [c for c in ref.columns if c not in ['Y', 'X']][0]
+    ref = ref.rename(columns={ref_name_col: 'name_ref',
+                               'Y': 'Y_ref', 'X': 'X_ref'})
+    ref['Y_ref'] = pd.to_numeric(ref['Y_ref'], errors='coerce')
+    ref['X_ref'] = pd.to_numeric(ref['X_ref'], errors='coerce')
+    ref = ref.dropna().reset_index(drop=True)
+
+    ext = extracted_df.copy()
+    ext_name_col = [c for c in ext.columns if c not in ['Y', 'X']][0]
+    ext['Y'] = pd.to_numeric(ext['Y'], errors='coerce')
+    ext['X'] = pd.to_numeric(ext['X'], errors='coerce')
+    ext = ext.dropna(subset=['Y', 'X']).reset_index(drop=True)
+
+    # זיהוי scale: קואורדינטות מקומיות (< 10000) מול מלאות
+    y_med_ext = ext['Y'].median()
+    x_med_ext = ext['X'].median()
+    y_med_ref = ref['Y_ref'].median()
+    x_med_ref = ref['X_ref'].median()
+
+    if y_med_ext < 10000 and y_med_ref > 10000:
+        y_offset = round(y_med_ref / 1000) * 1000 - round(y_med_ext / 1000) * 1000
+        x_offset = round(x_med_ref / 1000) * 1000 - round(x_med_ext / 1000) * 1000
+    else:
+        y_offset, x_offset = 0, 0
+
+    ref_y = ref['Y_ref'].values
+    ref_x = ref['X_ref'].values
+    ref_names = ref['name_ref'].values
+    used = set()
+    rows = []
+
+    for _, row in ext.iterrows():
+        y_full = row['Y'] + y_offset
+        x_full = row['X'] + x_offset
+        dists = ((ref_y - y_full) ** 2 + (ref_x - x_full) ** 2) ** 0.5
+        idx = int(dists.argmin())
+        dist = float(dists[idx])
+
+        if dist <= threshold and idx not in used:
+            used.add(idx)
+            rows.append({
+                'שם נקודה': ref_names[idx],
+                'Y': float(ref_y[idx]),
+                'X': float(ref_x[idx]),
+            })
+        else:
+            rows.append({
+                'שם נקודה': row[ext_name_col],
+                'Y': row['Y'],
+                'X': row['X'],
+            })
+
+    return pd.DataFrame(rows).drop_duplicates('שם נקודה').reset_index(drop=True)
 
 
 def extract_from_pdf(file_bytes: bytes) -> pd.DataFrame:

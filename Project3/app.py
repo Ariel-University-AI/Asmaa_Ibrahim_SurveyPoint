@@ -298,27 +298,20 @@ with tab_ocr:
 
     # העלאת קובץ
     st.markdown("### 📂 קובץ תיק חישובים")
-    if gemini_key:
+    col_f, col_c = st.columns([3, 2])
+    with col_f:
         uploaded = st.file_uploader(
             "גרורי קובץ TIF או PDF",
             type=["tif","TIF","tiff","TIFF","pdf","PDF"],
             key="ocr_upload",
         )
-        ref_csv = None
-    else:
-        col_f, col_c = st.columns(2)
-        with col_f:
-            uploaded = st.file_uploader(
-                "קובץ TIF או PDF",
-                type=["tif","TIF","tiff","TIFF","pdf","PDF"],
-                key="ocr_upload",
-            )
-        with col_c:
-            ref_csv = st.file_uploader(
-                "קובץ CSV לאימות (אופציונלי)",
-                type=["csv","CSV"],
-                key="ref_csv",
-            )
+    with col_c:
+        ref_csv = st.file_uploader(
+            "CSV ייחוס לשיפור דיוק (אופציונלי)",
+            type=["csv","CSV"],
+            key="ref_csv",
+            help="אם תעלי את קובץ הקואורדינטות המקורי — שמות שגויים יתוקנו אוטומטית לפי Spatial Matching (סף 2מ׳)"
+        )
 
     if uploaded:
         file_bytes = uploaded.read()
@@ -350,16 +343,18 @@ with tab_ocr:
                 prog.progress(int(done / total * 100))
                 stat.text(f"מעבד עמוד {done} מתוך {total}...")
 
+            ref_df = load_csv(ref_csv.getvalue(), is_bytes=True) if ref_csv else None
+
             with st.spinner("מריץ חילוץ..."):
                 try:
                     if fname.endswith(".pdf"):
                         df_ocr = extract_from_pdf(file_bytes)
                     elif gemini_key:
                         df_ocr = extract_with_gemini(file_bytes, api_key=gemini_key, progress_cb=cb)
+                        if ref_df is not None and len(df_ocr) > 0:
+                            from extractor import spatial_match_to_reference
+                            df_ocr = spatial_match_to_reference(df_ocr, ref_df, threshold=2.0)
                     else:
-                        ref_df = None
-                        if ref_csv:
-                            ref_df = load_csv(ref_csv.read(), is_bytes=True)
                         df_ocr = extract_from_tif(file_bytes, progress_cb=cb, reference_df=ref_df)
                     prog.progress(100)
                     stat.empty()
@@ -376,15 +371,18 @@ with tab_ocr:
             else:
                 st.success(f"✅ חולצו **{len(df_ocr)} נקודות**!")
 
+                if ref_df is not None:
+                    st.info("🔗 Spatial Matching הופעל — שמות תוקנו לפי מרחק מרחבי (סף: 2מ׳)")
+
                 col_t, col_p = st.columns([1, 2])
                 with col_t:
-                    st.dataframe(df_ocr, use_container_width=True, height=360,
+                    st.dataframe(ocr_core, use_container_width=True, height=360,
                         column_config={
                             "Y": st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
                             "X": st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
                         })
                 with col_p:
-                    fig_o = px.scatter(df_ocr, x="Y", y="X", hover_name="שם נקודה",
+                    fig_o = px.scatter(ocr_core, x="Y", y="X", hover_name="שם נקודה",
                                        color_discrete_sequence=["#00b4d8"])
                     fig_o.update_traces(marker=dict(size=7))
                     fig_o.update_layout(**PLOT_STYLE, height=360,
@@ -395,22 +393,22 @@ with tab_ocr:
 
                 col_c, col_e = st.columns(2)
                 with col_c:
-                    csv_out = df_ocr.to_csv(index=False).encode("utf-8-sig")
+                    csv_out = ocr_core.to_csv(index=False).encode("utf-8-sig")
                     st.download_button("⬇️ הורד CSV", data=csv_out,
                                        file_name="coordinates_extracted.csv",
                                        mime="text/csv", key=ck())
                 with col_e:
                     xls = io.BytesIO()
-                    df_ocr.to_excel(xls, index=False)
+                    ocr_core.to_excel(xls, index=False)
                     st.download_button("⬇️ הורד Excel", data=xls.getvalue(),
                                        file_name="coordinates_extracted.xlsx",
                                        mime="application/vnd.ms-excel", key=ck())
 
-                if models and len(df_ocr) >= 5:
+                if models and len(ocr_core) >= 5:
                     st.markdown("---")
                     st.markdown("### 🤖 זיהוי חריגים על הנתונים שחולצו")
                     mk = st.selectbox("מודל:", [f"מערך {k}" for k in models.keys()], key="ocr_model")
-                    df_r = df_ocr.copy()
+                    df_r = ocr_core.copy()
                     df_r["pred"] = models[mk.split()[-1]].predict(df_r[["Y","X"]])
                     df_r["סטטוס"] = df_r["pred"].map({1:"✅ תקין", -1:"⚠️ חשוד"})
                     anomaly_results(df_r)
