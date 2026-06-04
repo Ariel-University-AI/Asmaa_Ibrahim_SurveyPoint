@@ -488,7 +488,7 @@ def run_anomaly(df, contamination=0.05):
     model = IsolationForest(contamination=contamination, random_state=42, n_estimators=100)
     df = df.copy()
     df["pred"] = model.fit_predict(df[["Y", "X"]])
-    df["סטטוס"] = df["pred"].map({1: "תקין", -1: "⚠ חשוד"})
+    df["סטטוס"] = df["pred"].map({1: "✅ תקין", -1: "⚠️ חשוד"})
     return df
 
 def load_api_key():
