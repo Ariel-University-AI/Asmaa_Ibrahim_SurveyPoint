@@ -594,7 +594,7 @@ def extract_with_gemini(
 
         t0 = time.time()
         offset = t0 - t_global
-        print(f"P{p+1}: ▶ START  (+{offset:.1f}s מהתחלה, {len(img_b64)//1024}KB)")
+        print(f"P{p+1}: START (+{offset:.1f}s, {len(img_b64)//1024}KB)")
 
         payload = {"contents": [{"parts": [
             {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
@@ -610,7 +610,9 @@ def extract_with_gemini(
                     print(f"P{p+1}: 429, wait {wait}s...")
                     time.sleep(wait)
                     continue
-                resp.raise_for_status()
+                if resp.status_code != 200:
+                    print(f"P{p+1}: HTTP {resp.status_code} — {resp.text[:300]}")
+                    resp.raise_for_status()
                 raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
                 s, e = raw.find('['), raw.rfind(']')
                 if s != -1 and e > s:
@@ -637,7 +639,7 @@ def extract_with_gemini(
                         except Exception:
                             pass
                 elapsed = time.time() - t0
-                print(f"P{p+1}: ✓ DONE   {len(pts)} pts  ({elapsed:.1f}s)")
+                print(f"P{p+1}: DONE {len(pts)} pts ({elapsed:.1f}s)")
                 break
             except Exception as ex:
                 print(f"P{p+1} err: {ex}")
@@ -651,7 +653,7 @@ def extract_with_gemini(
     for batch_start in range(0, n_pages, BATCH):
         batch = list(range(batch_start, min(batch_start + BATCH, n_pages)))
         bt0 = time.time()
-        print(f"\n── Batch {batch_start//BATCH+1} ── דפים {[p+1 for p in batch]}")
+        print(f"\n-- Batch {batch_start//BATCH+1} -- pages {[p+1 for p in batch]}")
         with ThreadPoolExecutor(max_workers=BATCH) as pool:
             futures = {pool.submit(_send_page, p): p for p in batch}
             for fut in as_completed(futures):
@@ -660,7 +662,7 @@ def extract_with_gemini(
                 done[0] += 1
                 if progress_cb:
                     progress_cb(done[0], n_pages)
-        print(f"── Batch {batch_start//BATCH+1} סיום: {time.time()-bt0:.1f}s ──")
+        print(f"-- Batch {batch_start//BATCH+1} done: {time.time()-bt0:.1f}s --")
         if batch_start + BATCH < n_pages:
             time.sleep(1)
 
