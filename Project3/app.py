@@ -166,7 +166,7 @@ st.markdown("""
 /* Nebula blobs */
 .stApp::before {
     content: '';
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background:
         radial-gradient(circle 500px at 8%  90%, rgba(123,47,190,0.12) 0%, transparent 70%),
         radial-gradient(circle 600px at 92% 8%,  rgba(0,212,255,0.08)  0%, transparent 70%),
@@ -176,7 +176,7 @@ st.markdown("""
 }
 .stApp::after {
     content: '';
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background:
         radial-gradient(circle 400px at 50% 50%, rgba(5,10,30,0.4) 0%, transparent 80%),
         radial-gradient(circle 200px at 35% 70%, rgba(123,47,190,0.06) 0%, transparent 100%);
@@ -185,7 +185,7 @@ st.markdown("""
 
 /* Stars layer 1 — כחול */
 .sp-stars1 {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
     width: 2px; height: 2px; border-radius: 50%; background: transparent;
     animation: stars-twinkle 4s ease-in-out infinite;
     box-shadow:
@@ -212,7 +212,7 @@ st.markdown("""
 }
 /* Stars layer 2 — זהב */
 .sp-stars2 {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
     width: 2px; height: 2px; border-radius: 50%; background: transparent;
     animation: stars-twinkle2 6s ease-in-out infinite 1.5s;
     box-shadow:
@@ -230,7 +230,7 @@ st.markdown("""
 
 /* Fine geodetic grid */
 .sp-grid {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background-image:
         linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px),
