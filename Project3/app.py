@@ -565,8 +565,12 @@ PLOT_STYLE = dict(
     plot_bgcolor="rgba(10,14,26,0.95)",
     paper_bgcolor="rgba(0,0,0,0)",
     font=dict(color="#90e0ef", size=13),
-    legend=dict(bgcolor="rgba(13,27,42,0.9)", bordercolor="#00D4FF", borderwidth=1),
-    margin=dict(l=50, r=20, t=30, b=50),
+    legend=dict(
+        bgcolor="rgba(13,27,42,0.9)", bordercolor="#00D4FF", borderwidth=1,
+        orientation="h", yanchor="bottom", y=-0.22,
+        xanchor="center", x=0.5,
+    ),
+    margin=dict(l=50, r=20, t=30, b=80),
 )
 
 _ck = [0]
