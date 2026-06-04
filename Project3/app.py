@@ -489,7 +489,7 @@ def run_anomaly(df, contamination=0.05):
     coords = df[["Y", "X"]].copy()
     df = df.copy()
     df["pred"] = model.fit_predict(coords)
-    df["סטטוס"] = df["pred"].map({1: "✅ תקין", -1: "⚠️ חשוד"})
+    df["סטטוס"] = df["pred"].map({1: "תקין", -1: "חשוד"})
     return df
 
 def load_api_key():
