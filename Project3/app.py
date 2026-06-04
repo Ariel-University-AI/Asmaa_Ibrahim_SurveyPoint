@@ -592,15 +592,6 @@ if "ocr_df" not in st.session_state:
             st.session_state["ocr_df"] = _df
             st.session_state["_demo_mode"] = True
 
-# ברירות מחדל Data1 (מדף שער התיק)
-if st.session_state.get("_demo_mode") and not st.session_state.get("_meta_set"):
-    st.session_state["tik_num"]   = "362"
-    st.session_state["tlr_num"]   = "8/11-82"
-    st.session_state["tlr_year"]  = "1955"
-    st.session_state["gush"]      = "11200"
-    st.session_state["helka"]     = "1"
-    st.session_state["tik_chish"] = "405/55"
-    st.session_state["_meta_set"] = True
 PLOT_STYLE = dict(
     plot_bgcolor="rgba(10,14,26,0.95)",
     paper_bgcolor="rgba(0,0,0,0)",
@@ -982,6 +973,8 @@ with tab_home:
 
     # ── פרטי תיק חישובים ──────────────────────────────────────────────────────
     st.markdown("### 📋 פרטי תיק חישובים")
+    if not st.session_state.get("_meta_set"):
+        st.info("💡 פרטי התיק יחולצו אוטומטית מדף השער לאחר העלאת קובץ TIF בלשונית 'חילוץ'.")
     r1c1, r1c2, r1c3 = st.columns(3)
     with r1c1: tik_num  = st.text_input("מספר תיק",          key="tik_num",  placeholder="9546")
     with r1c2: tlr_num  = st.text_input('מספר תל"ר',         key="tlr_num",  placeholder="989-986")
