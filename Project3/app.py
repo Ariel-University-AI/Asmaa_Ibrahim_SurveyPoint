@@ -444,7 +444,7 @@ st.markdown("""
         <div class="hr-center"></div>
     </div>
     <div class="hero-title">SURVEYPOINT</div>
-    <div class="hero-sub">מערכת חכמה לניתוח תיקי חישובים הנדסיים | אוניברסיטת אריאל</div>
+    <div class="hero-sub">חילוץ קואורדינטות מתיקי חישובים ישנים &nbsp;|&nbsp; זיהוי שגיאות מדידה אוטומטי &nbsp;|&nbsp; אוניברסיטת אריאל</div>
     <div class="hero-coords">Y: 151,650.99<br>X: 243,464.96<br>&Delta;: &plusmn;0.003m</div>
     <div class="hero-status">
         <span><span class="hs-dot">&#9679;</span> ACTIVE</span>
@@ -506,6 +506,15 @@ def load_api_key():
 DATASETS  = get_datasets()
 AUTO_KEY  = load_api_key()
 COLORS    = ["#00D4FF", "#ffd700", "#00ff88", "#ff6b6b"]
+
+# ── דוגמה ברירת מחדל — טוען Data1 בכניסה ראשונה ──────────────────────────────
+if "ocr_df" not in st.session_state:
+    _default = os.path.join(ROOT_DIR, "DATA", "1", "coordinates_1.CSV")
+    if os.path.exists(_default):
+        _df = load_csv(_default)
+        if _df is not None:
+            st.session_state["ocr_df"] = _df
+            st.session_state["_demo_mode"] = True
 PLOT_STYLE = dict(
     plot_bgcolor="rgba(10,14,26,0.95)",
     paper_bgcolor="rgba(0,0,0,0)",
@@ -588,7 +597,11 @@ tab_ocr, tab_detect, tab_eda, tab_home = st.tabs([
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_ocr:
     st.markdown("## 📄 חילוץ קואורדינטות מתיק חישובים")
-    st.markdown("העלאת תיק חישובים (TIF/PDF) לחילוץ קואורדינטות אוטומטי.")
+    st.markdown("העלאת קובץ TIF/PDF של תיק חישובים — המערכת מחלצת את כל הקואורדינטות אוטומטית ומזהה נקודות חשודות.")
+
+    if st.session_state.get("_demo_mode"):
+        st.info("📊 **מצב דוגמה** — מוצגים נתוני Data1 (241 נקודות). העלה קובץ TIF משלך להחלפה.")
+
     st.markdown("---")
 
     if AUTO_KEY:
@@ -746,13 +759,35 @@ with tab_detect:
     st.markdown("## 🤖 זיהוי חריגים")
     st.markdown("---")
 
+    with st.expander("ℹ️ כיצד עובד זיהוי החריגים?", expanded=False):
+        st.markdown("""
+**Isolation Forest** — אלגוריתם בינה מלאכותית לזיהוי נקודות חריגות:
+
+- 🌳 בונה מאות עצי החלטה אקראיים על הקואורדינטות
+- 📏 נקודה **חריגה** = מבודדת בקלות (מעטים ענפים לבידוד)
+- 📍 נקודה **תקינה** = דורשת עץ עמוק יותר לבידוד
+
+**מתי נקודה תסומן כחשודה?**
+- קואורדינטות חריגות מהאשכול הגיאוגרפי הכללי
+- שגיאות כתיב בתיק החישובים
+- נקודות שנמדדו בשיטה שונה
+
+**פרמטר הרגישות:** 0.05 = 5% מהנקודות יסומנו כחשודות. הגדל לגילוי יותר שגיאות.
+        """)
+
+    st.markdown("---")
     has_ocr = "ocr_df" in st.session_state and st.session_state["ocr_df"] is not None
 
     if has_ocr:
         df_input = st.session_state["ocr_df"]
-        st.success(f"✅ {len(df_input)} נקודות מחולצות")
-        contamination = st.slider("רגישות לחריגים", 0.01, 0.20, 0.05, 0.01,
-                                  help="0.05 = 5% מהנקודות יסומנו כחשודות", key="det_cont")
+        col_info, col_slider = st.columns([2, 1])
+        with col_info:
+            st.success(f"✅ {len(df_input)} נקודות מוכנות לניתוח")
+        with col_slider:
+            contamination = st.slider(
+                "רגישות לחריגים", 0.01, 0.20, 0.05, 0.01, key="det_cont",
+                help="ערך נמוך = מחמיר יותר | ערך גבוה = מגלה יותר חשודות")
+        st.caption("💡 שנה את הרגישות לראות כיצד הדגם מסווג מחדש את הנקודות")
         df_r = run_anomaly(df_input, contamination=contamination)
         show_anomaly_chart(df_r)
     else:
