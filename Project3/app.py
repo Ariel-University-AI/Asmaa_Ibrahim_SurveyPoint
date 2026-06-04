@@ -443,6 +443,16 @@ st.markdown("""
     </div>
     <div class="hero-title">SURVEYPOINT</div>
     <div class="hero-sub">חילוץ קואורדינטות מתיקי חישובים ישנים &nbsp;|&nbsp; זיהוי שגיאות מדידה אוטומטי &nbsp;|&nbsp; אוניברסיטת אריאל</div>
+    <div style="margin-top:18px;font-size:0.85rem;letter-spacing:2px;opacity:0.9;
+                background:linear-gradient(90deg,#00D4FF,#FFD700);
+                -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                background-clip:text;position:relative;">
+        Every Point Has Its Place — SurveyPoint &nbsp;|&nbsp;
+        אסמאה בדיר איבראהים עיסא &nbsp;·&nbsp;
+        בהנחיית ד״ר ספרא אלי &nbsp;·&nbsp;
+        קורס איסוף ועיבוד מידע גאודטי &nbsp;·&nbsp;
+        אוניברסיטת אריאל 2026
+    </div>
     <div class="hero-coords">Y: 151,650.99<br>X: 243,464.96<br>&Delta;: &plusmn;0.003m</div>
     <div class="hero-status">
         <span><span class="hs-dot">&#9679;</span> ACTIVE</span>
