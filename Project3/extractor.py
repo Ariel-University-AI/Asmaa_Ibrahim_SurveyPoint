@@ -585,11 +585,16 @@ def extract_with_gemini(
         pages_b64[p] = base64.b64encode(buf.getvalue()).decode()
 
     done = [0]
+    t_global = time.time()
 
     def _send_page(p):
         img_b64 = pages_b64.get(p)
         if img_b64 is None:
             return p, []
+
+        t0 = time.time()
+        offset = t0 - t_global
+        print(f"P{p+1}: ▶ START  (+{offset:.1f}s מהתחלה, {len(img_b64)//1024}KB)")
 
         payload = {"contents": [{"parts": [
             {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
@@ -621,19 +626,18 @@ def extract_with_gemini(
                                 continue
                             y = float(str(item.get('Y', item.get('y', 0))).replace(',', '.'))
                             x = float(str(item.get('X', item.get('x', 0))).replace(',', '.'))
-                            # תיקון: 4 ספרות → הסר ספרה ראשונה (שגיאת OCR נפוצה)
                             if 1000 <= y < 10000:
                                 y = float(str(y)[1:])
                             if 1000 <= x < 10000:
                                 x = float(str(x)[1:])
-                            # סינון פורמט: רק 3 ספרות (100-999) או 6 ספרות (100000-999999)
                             if not (_is_valid_gemini_coord(y) and _is_valid_gemini_coord(x)):
                                 continue
                             if name and abs(y - x) > 1:
                                 pts.append({'שם נקודה': name, 'Y': y, 'X': x})
                         except Exception:
                             pass
-                print(f"P{p+1}: {len(pts)} pts")
+                elapsed = time.time() - t0
+                print(f"P{p+1}: ✓ DONE   {len(pts)} pts  ({elapsed:.1f}s)")
                 break
             except Exception as ex:
                 print(f"P{p+1} err: {ex}")
@@ -646,6 +650,8 @@ def extract_with_gemini(
 
     for batch_start in range(0, n_pages, BATCH):
         batch = list(range(batch_start, min(batch_start + BATCH, n_pages)))
+        bt0 = time.time()
+        print(f"\n── Batch {batch_start//BATCH+1} ── דפים {[p+1 for p in batch]}")
         with ThreadPoolExecutor(max_workers=BATCH) as pool:
             futures = {pool.submit(_send_page, p): p for p in batch}
             for fut in as_completed(futures):
@@ -654,6 +660,7 @@ def extract_with_gemini(
                 done[0] += 1
                 if progress_cb:
                     progress_cb(done[0], n_pages)
+        print(f"── Batch {batch_start//BATCH+1} סיום: {time.time()-bt0:.1f}s ──")
         if batch_start + BATCH < n_pages:
             time.sleep(1)
 
