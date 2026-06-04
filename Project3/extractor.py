@@ -641,23 +641,6 @@ def extract_with_gemini(
                                 pts.append({'שם נקודה': name, 'Y': y, 'X': x})
                         except Exception:
                             pass
-                # תיקון מרחבי: אם נקודה רחוקה מהcluster אבל Swap יביא אותה קרוב — תקן
-                if len(pts) >= 5:
-                    ys = sorted(pt['Y'] for pt in pts)
-                    xs = sorted(pt['X'] for pt in pts)
-                    y_med = ys[len(ys)//2]
-                    x_med = xs[len(xs)//2]
-                    fixed = []
-                    for pt in pts:
-                        y, x = pt['Y'], pt['X']
-                        d_norm = abs(y - y_med) + abs(x - x_med)
-                        d_swap = abs(x - y_med) + abs(y - x_med)
-                        if d_swap < d_norm * 0.4 and d_norm > 5:
-                            fixed.append({'שם נקודה': pt['שם נקודה'], 'Y': x, 'X': y})
-                        else:
-                            fixed.append(pt)
-                    pts = fixed
-
                 elapsed = time.time() - t0
                 print(f"P{p+1}: DONE {len(pts)} pts ({elapsed:.1f}s)")
                 break
@@ -691,10 +674,13 @@ def extract_with_gemini(
         if batch_start + BATCH < n_pages:
             time.sleep(1)
 
-    # ── Adaptive Double-Pass: ריצה שנייה לדפים חשודים בלבד ───────────────────
-    # קריטריון: דף שהחזיר 0 נקודות (ואינו ריק) → ריצה שנייה
+    # ── Adaptive Double-Pass: ריצה שנייה רק לדפים גדולים עם 0 נקודות ───────
+    # קריטריון: דף 0 נקודות + גדול מ-400KB (סימן לתוכן אמיתי, לא דף ריק)
+    MIN_SIZE_RETRY = 400 * 1024 // 4 * 3  # ~400KB decoded ≈ 533KB base64
     retry_pages = [p for p in range(n_pages)
-                   if len(results.get(p, [])) == 0 and pages_b64.get(p) is not None]
+                   if len(results.get(p, [])) == 0
+                   and pages_b64.get(p) is not None
+                   and len(pages_b64[p]) > MIN_SIZE_RETRY]
     if retry_pages:
         print(f"\n-- Adaptive retry: {len(retry_pages)} pages with 0 results --")
         time.sleep(2)
