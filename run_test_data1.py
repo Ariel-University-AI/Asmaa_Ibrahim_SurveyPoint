@@ -72,7 +72,12 @@ if len(df_ext) == 0:
 
 # Compare vs reference CSV
 print("\n=== Comparison vs reference CSV ===")
-orig = pd.read_csv(CSV_PATH, encoding="cp1255")
+for enc in ["utf-8-sig", "utf-8", "cp1255", "latin-1"]:
+    try:
+        orig = pd.read_csv(CSV_PATH, encoding=enc)
+        break
+    except Exception:
+        continue
 orig.columns = ["name", "Y", "X"]
 orig["name"] = orig["name"].astype(str).str.strip()
 
@@ -101,7 +106,7 @@ matched    = orig_names & ext_names
 only_orig  = orig_names - ext_names
 only_ext   = ext_names  - orig_names
 
-TOL = 1.5
+TOL = 0.05
 good, bad = [], []
 for name in sorted(matched):
     yo, xo = orig_dict[name]

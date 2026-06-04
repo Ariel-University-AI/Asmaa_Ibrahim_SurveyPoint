@@ -632,7 +632,10 @@ def extract_with_gemini(
                                 y = float(str(y)[1:])
                             if 1000 <= x < 10000:
                                 x = float(str(x)[1:])
-                            if name and y > 0 and x > 0 and abs(y - x) > 1:
+                            # סנן Y≈X רק לקואורדינטות מקומיות (לא ITM מלא)
+                            if y < 10000 and abs(y - x) < 1:
+                                continue
+                            if name and y > 0 and x > 0:
                                 pts.append({'שם נקודה': name, 'Y': y, 'X': x})
                         except Exception:
                             pass
@@ -679,6 +682,12 @@ def extract_with_gemini(
     df['Y'] = pd.to_numeric(df['Y'], errors='coerce')
     df['X'] = pd.to_numeric(df['X'], errors='coerce')
     df = df.dropna(subset=['Y', 'X'])
+
+    # Auto-detect coordinate system: if median Y > median X significantly, swap
+    y_med = df['Y'].median()
+    x_med = df['X'].median()
+    if y_med > x_med * 1.5:   # Y much larger than X → likely swapped
+        df = df.rename(columns={'Y': 'X', 'X': 'Y'})
 
     # Voting dedup — לכל שם שומר הקואורדינטה שחוזרת הכי הרבה
     best = []
