@@ -930,9 +930,15 @@ with tab_eda:
         st.stop()
 
     c1, c2, c3, c4 = st.columns(4)
+    # טווח ללא outliers — IQR × 1.5
+    def _range_no_outliers(s):
+        q1, q3 = s.quantile(0.05), s.quantile(0.95)
+        clean = s[(s >= q1) & (s <= q3)]
+        return clean.max() - clean.min() if len(clean) > 1 else s.max() - s.min()
+
     c1.metric("מספר נקודות", len(df_e))
-    c2.metric("טווח Y", f"{df_e['Y'].max()-df_e['Y'].min():.1f}")
-    c3.metric("טווח X", f"{df_e['X'].max()-df_e['X'].min():.1f}")
+    c2.metric("טווח Y (מטר)", f"{_range_no_outliers(df_e['Y']):.1f}")
+    c3.metric("טווח X (מטר)", f"{_range_no_outliers(df_e['X']):.1f}")
     c4.metric("ערכים חסרים", int(df_e.isnull().sum().sum()))
 
     col1, col2 = st.columns(2)
