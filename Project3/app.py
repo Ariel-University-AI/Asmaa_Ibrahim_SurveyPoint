@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -17,13 +18,126 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ── רקע אנימטיבי ──────────────────────────────────────────────────────────────
+components.html("""
+<script>
+(function() {
+    function init() {
+        try {
+            var doc = window.parent.document;
+            var existing = doc.getElementById('sp-bg-canvas');
+            if (existing) return;
+
+            var canvas = doc.createElement('canvas');
+            canvas.id = 'sp-bg-canvas';
+            canvas.style.cssText = [
+                'position:fixed','top:0','left:0',
+                'width:100%','height:100%',
+                'z-index:0','pointer-events:none',
+                'opacity:0.85'
+            ].join(';');
+            doc.body.insertBefore(canvas, doc.body.firstChild);
+
+            function resize() {
+                canvas.width  = window.parent.innerWidth;
+                canvas.height = window.parent.innerHeight;
+            }
+            resize();
+            window.parent.addEventListener('resize', resize);
+
+            var ctx = canvas.getContext('2d');
+            var pts = [];
+            for (var i = 0; i < 80; i++) {
+                var gold = Math.random() > 0.72;
+                pts.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 0.25,
+                    vy: (Math.random() - 0.5) * 0.25,
+                    r:  Math.random() * 2 + 0.4,
+                    a:  Math.random(),
+                    da: (Math.random() * 0.008 + 0.002) * (Math.random() > 0.5 ? 1 : -1),
+                    c:  gold ? '#FFD700' : '#00D4FF'
+                });
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                /* fine grid */
+                ctx.strokeStyle = 'rgba(0,212,255,0.03)';
+                ctx.lineWidth = 1;
+                for (var x = 0; x < canvas.width; x += 60) {
+                    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+                }
+                for (var y = 0; y < canvas.height; y += 60) {
+                    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+                }
+
+                /* nebula corners */
+                var g1 = ctx.createRadialGradient(0, 0, 0, 0, 0, 400);
+                g1.addColorStop(0, 'rgba(123,47,190,0.07)');
+                g1.addColorStop(1, 'transparent');
+                ctx.fillStyle = g1; ctx.fillRect(0, 0, 400, 400);
+
+                var g2 = ctx.createRadialGradient(canvas.width, canvas.height, 0,
+                         canvas.width, canvas.height, 450);
+                g2.addColorStop(0, 'rgba(0,212,255,0.06)');
+                g2.addColorStop(1, 'transparent');
+                ctx.fillStyle = g2;
+                ctx.fillRect(canvas.width - 450, canvas.height - 450, 450, 450);
+
+                var g3 = ctx.createRadialGradient(canvas.width, 0, 0, canvas.width, 0, 300);
+                g3.addColorStop(0, 'rgba(13,31,60,0.12)');
+                g3.addColorStop(1, 'transparent');
+                ctx.fillStyle = g3; ctx.fillRect(canvas.width - 300, 0, 300, 300);
+
+                /* animated points */
+                pts.forEach(function(p) {
+                    p.x += p.vx; p.y += p.vy;
+                    p.a += p.da;
+                    if (p.a >= 1) { p.a = 1; p.da = -Math.abs(p.da); }
+                    if (p.a <= 0) { p.a = 0; p.da =  Math.abs(p.da); }
+                    if (p.x < 0) p.x = canvas.width;
+                    if (p.x > canvas.width) p.x = 0;
+                    if (p.y < 0) p.y = canvas.height;
+                    if (p.y > canvas.height) p.y = 0;
+
+                    ctx.save();
+                    ctx.globalAlpha = p.a * 0.9;
+                    ctx.shadowBlur  = 10;
+                    ctx.shadowColor = p.c;
+                    ctx.fillStyle   = p.c;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                requestAnimationFrame(draw);
+            }
+            draw();
+        } catch(e) {}
+    }
+    setTimeout(init, 300);
+    setTimeout(init, 1500);
+})();
+</script>
+""", height=0)
+
 # ── עיצוב ─────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&family=Orbitron:wght@400;700;900&display=swap');
 
 * { font-family: 'Heebo', sans-serif !important; direction: rtl; }
-.stApp { background: #0A0E1A; }
+.stApp {
+    background: radial-gradient(ellipse at 20% 50%, #0d1f3c 0%, #050c1a 50%, #0a0518 100%) !important;
+    background-attachment: fixed !important;
+}
+/* Hide components iframe */
+iframe[title="streamlit_components"] { display: none !important; }
+
 
 /* ══════════════════════════════════════════════════
    ANIMATIONS
