@@ -131,10 +131,115 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&family=Orbitron:wght@400;700;900&display=swap');
 
 * { font-family: 'Heebo', sans-serif !important; direction: rtl; }
-.stApp {
-    background: radial-gradient(ellipse at 20% 50%, #0d1f3c 0%, #050c1a 50%, #0a0518 100%) !important;
-    background-attachment: fixed !important;
+
+@keyframes nebula-float {
+    0%,100% { transform: scale(1)   translateY(0px); }
+    50%     { transform: scale(1.08) translateY(-30px); }
 }
+@keyframes nebula-float2 {
+    0%,100% { transform: scale(1)   translateY(0px); }
+    50%     { transform: scale(1.12) translateY(20px); }
+}
+@keyframes bg-breathe {
+    0%,100% { opacity: 1; }
+    50%     { opacity: 0.82; }
+}
+@keyframes stars-twinkle {
+    0%,100% { opacity: 0.6; }
+    50%     { opacity: 1; }
+}
+@keyframes stars-twinkle2 {
+    0%,100% { opacity: 0.3; }
+    50%     { opacity: 0.9; }
+}
+
+.stApp {
+    background:
+        radial-gradient(ellipse at 18% 55%, rgba(13,31,60,0.95) 0%, transparent 55%),
+        radial-gradient(ellipse at 82% 20%, rgba(10,5,24,0.9) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(5,12,30,0.8) 0%, transparent 60%),
+        #03060f !important;
+    background-attachment: fixed !important;
+    position: relative !important;
+}
+
+/* Nebula blobs */
+.stApp::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+        radial-gradient(circle 500px at 8%  90%, rgba(123,47,190,0.12) 0%, transparent 70%),
+        radial-gradient(circle 600px at 92% 8%,  rgba(0,212,255,0.08)  0%, transparent 70%),
+        radial-gradient(circle 350px at 75% 80%, rgba(13,31,60,0.25)   0%, transparent 70%),
+        radial-gradient(circle 280px at 20% 15%, rgba(0,100,200,0.07)  0%, transparent 70%);
+    animation: nebula-float 18s ease-in-out infinite;
+}
+.stApp::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+        radial-gradient(circle 400px at 50% 50%, rgba(5,10,30,0.4) 0%, transparent 80%),
+        radial-gradient(circle 200px at 35% 70%, rgba(123,47,190,0.06) 0%, transparent 100%);
+    animation: nebula-float2 22s ease-in-out infinite;
+}
+
+/* Stars layer 1 — כחול */
+.sp-stars1 {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    width: 2px; height: 2px; border-radius: 50%; background: transparent;
+    animation: stars-twinkle 4s ease-in-out infinite;
+    box-shadow:
+        120px 80px 3px rgba(0,212,255,0.7),  380px 210px 2px rgba(0,212,255,0.5),
+        620px 45px  2px rgba(0,212,255,0.8),  890px 320px 3px rgba(0,212,255,0.4),
+        1150px 180px 2px rgba(0,212,255,0.6), 1380px 90px  1px rgba(0,212,255,0.9),
+        1620px 440px 2px rgba(0,212,255,0.5), 1820px 200px 3px rgba(0,212,255,0.7),
+        200px 500px 2px rgba(0,212,255,0.4),  460px 680px  2px rgba(0,212,255,0.6),
+        700px 820px 3px rgba(0,212,255,0.5),  950px 600px  1px rgba(0,212,255,0.8),
+        1200px 750px 2px rgba(0,212,255,0.4), 1450px 520px 2px rgba(0,212,255,0.7),
+        1700px 890px 3px rgba(0,212,255,0.5), 80px  350px  1px rgba(0,212,255,0.9),
+        330px 920px 2px rgba(0,212,255,0.6),  580px 400px  2px rgba(0,212,255,0.4),
+        820px 270px 3px rgba(0,212,255,0.7),  1070px 480px 1px rgba(0,212,255,0.5),
+        1300px 650px 2px rgba(0,212,255,0.8), 1550px 310px 2px rgba(0,212,255,0.4),
+        1780px 570px 3px rgba(0,212,255,0.6), 50px  700px  2px rgba(0,212,255,0.5),
+        290px 140px 1px rgba(0,212,255,0.9),  540px 960px  2px rgba(0,212,255,0.3),
+        770px 130px 2px rgba(0,212,255,0.7),  1020px 870px 3px rgba(0,212,255,0.5),
+        1270px 420px 1px rgba(0,212,255,0.8), 1510px 760px 2px rgba(0,212,255,0.4),
+        160px 610px 2px rgba(0,212,255,0.6),  410px 790px  1px rgba(0,212,255,0.7),
+        650px 550px 3px rgba(0,212,255,0.4),  900px 730px  2px rgba(0,212,255,0.6),
+        1100px 370px 2px rgba(0,212,255,0.5), 1340px 850px 3px rgba(0,212,255,0.7),
+        1580px 160px 1px rgba(0,212,255,0.8), 1840px 640px 2px rgba(0,212,255,0.4),
+        240px 1020px 2px rgba(0,212,255,0.5), 490px 470px  1px rgba(0,212,255,0.9);
+}
+/* Stars layer 2 — זהב */
+.sp-stars2 {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    width: 2px; height: 2px; border-radius: 50%; background: transparent;
+    animation: stars-twinkle2 6s ease-in-out infinite 1.5s;
+    box-shadow:
+        70px  150px 3px rgba(255,215,0,0.7),  320px 380px 2px rgba(255,215,0,0.5),
+        560px 720px 2px rgba(255,215,0,0.8),  810px 510px 3px rgba(255,215,0,0.4),
+        1060px 290px 2px rgba(255,215,0,0.6), 1310px 680px 1px rgba(255,215,0,0.9),
+        1560px 430px 2px rgba(255,215,0,0.5), 1800px 770px 3px rgba(255,215,0,0.7),
+        430px 860px 2px rgba(255,215,0,0.4),  680px 190px  2px rgba(255,215,0,0.6),
+        930px 940px 3px rgba(255,215,0,0.5),  1180px 620px 1px rgba(255,215,0,0.8),
+        1420px 120px 2px rgba(255,215,0,0.4), 1660px 580px 2px rgba(255,215,0,0.7),
+        190px 440px 3px rgba(255,215,0,0.5),  440px 260px  1px rgba(255,215,0,0.9),
+        690px 810px 2px rgba(255,215,0,0.6),  940px 390px  2px rgba(255,215,0,0.4),
+        1190px 730px 3px rgba(255,215,0,0.7), 1430px 950px 1px rgba(255,215,0,0.5);
+}
+
+/* Fine geodetic grid */
+.sp-grid {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+        linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px),
+        linear-gradient(rgba(0,212,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.05) 1px, transparent 1px);
+    background-size: 25px 25px, 25px 25px, 125px 125px, 125px 125px;
+    animation: bg-breathe 12s ease-in-out infinite;
+}
+
 /* Hide components iframe */
 iframe[title="streamlit_components"] { display: none !important; }
 
@@ -413,6 +518,13 @@ hr { border-color: rgba(0,212,255,0.1) !important; }
     font-weight:800 !important;
 }
 </style>
+""", unsafe_allow_html=True)
+
+# ── רקע נקודות וגריד ─────────────────────────────────────────────────────────
+st.markdown("""
+<div class="sp-stars1"></div>
+<div class="sp-stars2"></div>
+<div class="sp-grid"></div>
 """, unsafe_allow_html=True)
 
 # ── Hero ───────────────────────────────────────────────────────────────────────
