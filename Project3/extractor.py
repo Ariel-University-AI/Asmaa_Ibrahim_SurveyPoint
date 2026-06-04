@@ -538,10 +538,11 @@ def extract_with_gemini(
 - אסור: עברית, סימנים & ( ) = *, שמות ארוכים מ-6 תווים
 
 סוגי קואורדינטות בישראל:
-- רשת ישראל הישנה (לפני 1994): Y ו-X בטווח 0–300,000
-- ITM חדש (אחרי 1994): Y בטווח 100,000–900,000, X בטווח 0–300,000
+- רשת ישנה (לפני 1994): Y (מזרח) בטווח 100,000–300,000 | X (צפון) בטווח 500,000–900,000
+- ITM חדש (אחרי 1994): Y (צפון) בטווח 100,000–900,000 | X (מזרח) בטווח 100,000–900,000
 - חישובים מקומיים: ערכים קטנים (עשרות עד אלפים)
 - זהה לפי הערכים שבדף ממש — אל תנחש
+- חשוב: Y תמיד העמודה המסומנת Y בטבלה — לא X!
 
 טבלאות שיש לחפש:
 - חשוב מצולע (traverse): עמודות Y ו-X בצד ימין
@@ -683,11 +684,21 @@ def extract_with_gemini(
     df['X'] = pd.to_numeric(df['X'], errors='coerce')
     df = df.dropna(subset=['Y', 'X'])
 
-    # Auto-detect coordinate system: if median Y > median X significantly, swap
+    # ── תיקון סדר Y/X אוטומטי לכל מערכת קואורדינטות ──────────────────────────
     y_med = df['Y'].median()
     x_med = df['X'].median()
-    if y_med > x_med * 1.5:   # Y much larger than X → likely swapped
-        df = df.rename(columns={'Y': 'X', 'X': 'Y'})
+
+    # בדיקה גלובלית: אם Y גדול מ-X ב-50% → כנראה מוחלף
+    if y_med > x_med * 1.5:
+        df = df.rename(columns={'Y': '_tmp', 'X': 'Y'}).rename(columns={'_tmp': 'X'})
+        y_med, x_med = x_med, y_med
+
+    # בדיקה ברמת שורה: לרשת ישנה/ITM (X > 400,000)
+    # Y אמור להיות קטן מ-X — אחרת החלף
+    if x_med > 400_000:
+        mask = df['Y'] > df['X']
+        if mask.sum() > 0:
+            df.loc[mask, ['Y', 'X']] = df.loc[mask, ['X', 'Y']].values
 
     # Voting dedup — לכל שם שומר הקואורדינטה שחוזרת הכי הרבה
     best = []
