@@ -648,7 +648,7 @@ def extract_with_gemini(
                 break
         return p, pts
 
-    BATCH = 1
+    BATCH = 5
     results = {}
 
     for batch_start in range(0, n_pages, BATCH):
