@@ -709,46 +709,59 @@ with tab_home:
     st.markdown("## 🏠 סקירה כללית")
     st.markdown("---")
 
-    dfs_all = {}
-    if DATASETS:
-        cols_m = st.columns(max(len(DATASETS), 1))
-        for idx, (fld, path) in enumerate(DATASETS.items()):
-            df = load_csv(path)
-            dfs_all[fld] = df
-            with cols_m[idx]:
-                if df is not None:
-                    st.metric(f"מערך {fld}", f"{len(df)} נקודות",
-                              f"Y: {df['Y'].min():.0f}–{df['Y'].max():.0f}")
-    else:
-        st.info("לא נמצאו מערכי נתונים בתיקיית DATA")
+    # ── פרטי תיק חישובים ──────────────────────────────────────────────────────
+    st.markdown("### 📋 פרטי תיק חישובים")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: tik_num = st.text_input("מספר תיק חישובי", key="tik_num", placeholder="למשל: 2024-15")
+    with c2: gush    = st.text_input("גוש",              key="gush",    placeholder="למשל: 6719")
+    with c3: helka   = st.text_input("חלקה",             key="helka",   placeholder="למשל: 42")
+    with c4: year    = st.text_input("שנת התיק",         key="year",    placeholder="למשל: 1982")
 
-    if dfs_all:
-        col_b, col_m = st.columns(2)
-        with col_b:
-            st.markdown("### השוואת גדלים")
-            bar_data = [{"מערך": f"מערך {k}", "נקודות": len(v)}
-                        for k, v in dfs_all.items() if v is not None]
-            if bar_data:
-                fig_bar = px.bar(pd.DataFrame(bar_data), x="מערך", y="נקודות",
-                                 color="מערך", color_discrete_sequence=COLORS)
-                fig_bar.update_layout(**PLOT_STYLE, height=300, showlegend=False)
-                st.plotly_chart(fig_bar, use_container_width=True, key=ck())
-        with col_m:
-            st.markdown("### מפת כל הנקודות")
-            fig_all = go.Figure()
-            for idx, (fld, df) in enumerate(dfs_all.items()):
-                if df is not None:
-                    fig_all.add_trace(go.Scatter(
-                        x=df["Y"], y=df["X"], mode="markers", name=f"מערך {fld}",
-                        marker=dict(size=4, color=COLORS[idx % len(COLORS)]),
-                        text=df["שם נקודה"],
-                        hovertemplate="<b>%{text}</b><br>Y:%{x:.1f}<br>X:%{y:.1f}<extra></extra>",
-                    ))
-            fig_all.update_layout(**PLOT_STYLE, height=300,
-                xaxis=dict(title="Y", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
-                yaxis=dict(title="X", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
-            )
-            st.plotly_chart(fig_all, use_container_width=True, key=ck())
+    if any([tik_num, gush, helka, year]):
+        st.markdown("---")
+        m1, m2, m3, m4 = st.columns(4)
+        if tik_num: m1.metric("📁 מספר תיק", tik_num)
+        if gush:    m2.metric("🗺️ גוש",        gush)
+        if helka:   m3.metric("📌 חלקה",       helka)
+        if year:    m4.metric("📅 שנת התיק",   year)
+
+    st.markdown("---")
+
+    # ── טבלאות קואורדינטות ────────────────────────────────────────────────────
+    has_data = "ocr_df" in st.session_state and st.session_state["ocr_df"] is not None
+    if has_data:
+        df_src = st.session_state["ocr_df"]
+        df_analyzed = run_anomaly(df_src)
+        df_ok  = df_analyzed[df_analyzed["pred"] ==  1][["שם נקודה","Y","X"]].reset_index(drop=True)
+        df_bad = df_analyzed[df_analyzed["pred"] == -1][["שם נקודה","Y","X"]].reset_index(drop=True)
+
+        col_cfg = {
+            "Y": st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
+            "X": st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
+        }
+
+        col_ok, col_bad = st.columns(2)
+        with col_ok:
+            st.markdown(f"### ✅ נקודות תקינות — {len(df_ok)}")
+            st.dataframe(df_ok, use_container_width=True, height=400,
+                         column_config=col_cfg, hide_index=True)
+            csv_ok = df_ok.to_csv(index=False).encode("utf-8-sig")
+            st.download_button("⬇️ הורד תקינות CSV", data=csv_ok,
+                               file_name="valid_points.csv", mime="text/csv", key=ck())
+
+        with col_bad:
+            st.markdown(f"### ⚠️ נקודות חשודות — {len(df_bad)}")
+            if len(df_bad) > 0:
+                st.dataframe(df_bad, use_container_width=True, height=400,
+                             column_config=col_cfg, hide_index=True)
+                csv_bad = df_bad.to_csv(index=False).encode("utf-8-sig")
+                st.download_button("⬇️ הורד חשודות CSV", data=csv_bad,
+                                   file_name="suspicious_points.csv",
+                                   mime="text/csv", key=ck())
+            else:
+                st.success("לא נמצאו נקודות חשודות!")
+    else:
+        st.info("💡 חלץ קובץ TIF בלשונית 'חילוץ' כדי לראות את הנקודות כאן.")
 
 # ── תחתית ─────────────────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
