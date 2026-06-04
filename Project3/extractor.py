@@ -593,32 +593,28 @@ def extract_with_gemini(
         ]}]}
 
         pts = []
-        for attempt in range(3):
+        for attempt in range(2):   # max 2 attempts
             try:
-                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=120)
+                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=70)
                 if resp.status_code == 429:
-                    wait = 15 * (attempt + 1)
+                    wait = 20 * (attempt + 1)
                     print(f"P{p+1}: 429, wait {wait}s...")
                     time.sleep(wait)
                     continue
                 if resp.status_code != 200:
-                    print(f"P{p+1}: HTTP {resp.status_code} — {resp.text[:300]}")
-                    resp.raise_for_status()
+                    print(f"P{p+1}: HTTP {resp.status_code}")
+                    break   # don't retry on non-429 errors
                 raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
                 s, e = raw.find('['), raw.rfind(']')
                 if s != -1 and e > s:
                     try:
                         parsed = json.loads(raw[s:e+1])
                     except json.JSONDecodeError:
-                        # נסה לתקן JSON חלקי — חתוך בפסיק האחרון
                         chunk = raw[s:e+1]
                         last_comma = chunk.rfind(',')
-                        if last_comma != -1:
-                            try:
-                                parsed = json.loads(chunk[:last_comma] + ']')
-                            except Exception:
-                                parsed = []
-                        else:
+                        try:
+                            parsed = json.loads(chunk[:last_comma] + ']') if last_comma != -1 else []
+                        except Exception:
                             parsed = []
                     for item in parsed:
                         try:
@@ -643,6 +639,11 @@ def extract_with_gemini(
                 elapsed = time.time() - t0
                 print(f"P{p+1}: DONE {len(pts)} pts ({elapsed:.1f}s)")
                 break
+            except requests.exceptions.Timeout:
+                print(f"P{p+1}: timeout ({attempt+1}/2)")
+                if attempt == 0:
+                    time.sleep(3)  # brief wait before retry
+                # no retry after 2nd timeout
             except Exception as ex:
                 print(f"P{p+1} err: {ex}")
                 break
@@ -679,7 +680,17 @@ def extract_with_gemini(
     df['X'] = pd.to_numeric(df['X'], errors='coerce')
     df = df.dropna(subset=['Y', 'X'])
 
-    return df.drop_duplicates('שם נקודה').reset_index(drop=True)
+    # Voting dedup — לכל שם שומר הקואורדינטה שחוזרת הכי הרבה
+    best = []
+    for name, grp in df.groupby('שם נקודה', sort=False):
+        y_mode = grp['Y'].round(1).mode()
+        x_mode = grp['X'].round(1).mode()
+        best.append({
+            'שם נקודה': name,
+            'Y': float(y_mode.iloc[0] if len(y_mode) else grp['Y'].iloc[0]),
+            'X': float(x_mode.iloc[0] if len(x_mode) else grp['X'].iloc[0]),
+        })
+    return pd.DataFrame(best)
 
 
 def spatial_match_to_reference(
