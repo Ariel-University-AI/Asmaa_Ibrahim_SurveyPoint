@@ -488,7 +488,7 @@ def run_anomaly(df, contamination=0.05):
     model = IsolationForest(contamination=contamination, random_state=42, n_estimators=100)
     df = df.copy()
     df["pred"] = model.fit_predict(df[["Y", "X"]])
-    df["סטטוס"] = df["pred"].map({1: "✅ תקין", -1: "🟡 חשוד"})
+    df["סטטוס"] = df["pred"].map({1: "תקין ✅", -1: "חשוד 🟡"})
     return df
 
 def load_api_key():
@@ -629,7 +629,7 @@ def show_anomaly_chart(df_res):
         column_config={
             "Y":      st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
             "X":      st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
-            "סטטוס": st.column_config.TextColumn("סטטוס"),
+            "סטטוס": st.column_config.TextColumn("סטטוס", width="medium"),
         },
         hide_index=True,
     )
@@ -824,7 +824,7 @@ with tab_ocr:
                         column_config={
                             "Y": st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
                             "X": st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
-                            "סטטוס": st.column_config.TextColumn("סטטוס"),
+                            "סטטוס": st.column_config.TextColumn("סטטוס", width="medium"),
                         }
                     )
 
