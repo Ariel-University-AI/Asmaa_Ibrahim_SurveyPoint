@@ -8,9 +8,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "Project3"))
 import pandas as pd
 from extractor import extract_with_gemini
 
-TIF_PATH = os.path.join(os.path.dirname(__file__), "DATA", "1", "Data1.TIF")
-CSV_PATH = os.path.join(os.path.dirname(__file__), "DATA", "1", "coordinates_1.CSV")
-OUT_PATH = os.path.join(os.path.dirname(__file__), "coordinates_extracted_new.csv")
+# Dataset number — change to 1/2/3/4
+DATASET = "2"
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), "DATA", DATASET)
+TIF_PATH = next((os.path.join(DATA_DIR, f) for f in os.listdir(DATA_DIR)
+                 if f.lower().endswith(('.tif', '.tiff'))), None)
+CSV_PATH = next((os.path.join(DATA_DIR, f) for f in os.listdir(DATA_DIR)
+                 if f.lower().endswith(('.csv'))), None)
+OUT_PATH = os.path.join(os.path.dirname(__file__), f"coordinates_extracted_{DATASET}.csv")
+
+if not TIF_PATH or not os.path.exists(TIF_PATH):
+    print(f"No TIF found in DATA/{DATASET}/"); sys.exit(1)
+if not CSV_PATH or not os.path.exists(CSV_PATH):
+    print(f"No CSV found in DATA/{DATASET}/"); sys.exit(1)
+print(f"Dataset {DATASET}: {os.path.basename(TIF_PATH)} vs {os.path.basename(CSV_PATH)}")
 
 # API Key from key.txt
 KEY_FILE = os.path.join(os.path.dirname(__file__), "key.txt")
@@ -28,6 +40,14 @@ print(f"\nLoading {TIF_PATH}...")
 with open(TIF_PATH, "rb") as f:
     tif_bytes = f.read()
 print(f"File size: {len(tif_bytes)//1024} KB")
+
+# Count TIF pages
+try:
+    from PIL import Image as _PIL
+    _s = _PIL.open(io.BytesIO(tif_bytes))
+    print(f"Pages: {getattr(_s,'n_frames',1)}")
+except Exception:
+    pass
 
 # Extract
 print("\n=== Starting extraction ===")
