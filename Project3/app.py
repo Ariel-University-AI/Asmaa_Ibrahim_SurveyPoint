@@ -559,7 +559,7 @@ if st.session_state.get("_demo_mode") and not st.session_state.get("_meta_set"):
     st.session_state["tlr_year"]  = "1955"
     st.session_state["gush"]      = "11200"
     st.session_state["helka"]     = "1"
-    st.session_state["tik_chish"] = "105/55"
+    st.session_state["tik_chish"] = "405/55"
     st.session_state["_meta_set"] = True
 PLOT_STYLE = dict(
     plot_bgcolor="rgba(10,14,26,0.95)",
