@@ -587,47 +587,19 @@ with tab_ocr:
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_detect:
     st.markdown("## 🤖 זיהוי חריגים")
-    st.markdown("טעיני קובץ קואורדינטות — המערכת תזהה נקודות חשודות אוטומטית.")
     st.markdown("---")
 
     has_ocr = "ocr_df" in st.session_state and st.session_state["ocr_df"] is not None
-    source_opts = ["העלאת קובץ CSV", "מערך נתונים קיים"]
+
     if has_ocr:
-        source_opts.insert(0, "נתונים שחולצו מ-TIF ✅")
-
-    col_s, col_cont = st.columns([2, 1])
-    with col_s:
-        if has_ocr:
-            st.success(f"✅ {len(st.session_state['ocr_df'])} נקודות מחולצות מוכנות")
-        source = st.radio("מקור נתונים:", source_opts, horizontal=False, key="det_src")
-    with col_cont:
-        contamination = st.slider("רגישות לחריגים", 0.01, 0.20, 0.05, 0.01,
-                                  help="0.05 = 5% מהנקודות יסומנו כחשודות")
-
-    df_input = None
-    if source == "נתונים שחולצו מ-TIF ✅":
         df_input = st.session_state["ocr_df"]
-    elif source == "מערך נתונים קיים":
-        if DATASETS:
-            sel = st.selectbox("בחרי מערך:", [f"מערך {k}" for k in DATASETS.keys()], key="det_sel")
-            df_input = load_csv(DATASETS[sel.split()[-1]])
-        else:
-            st.warning("לא נמצאו מערכי נתונים")
-    else:
-        up = st.file_uploader("קובץ CSV (שם נקודה, Y, X):",
-                              type=["csv", "CSV"], key="det_csv")
-        if up:
-            df_input = load_csv(up.read(), is_bytes=True)
-            if df_input is None:
-                st.error("לא ניתן לקרוא את הקובץ — בדקי שהפורמט תקין")
-
-    if df_input is not None and len(df_input) >= 5:
-        st.markdown("---")
-        st.success(f"✅ נטענו **{len(df_input)}** נקודות")
+        st.success(f"✅ {len(df_input)} נקודות מחולצות")
+        contamination = st.slider("רגישות לחריגים", 0.01, 0.20, 0.05, 0.01,
+                                  help="0.05 = 5% מהנקודות יסומנו כחשודות", key="det_cont")
         df_r = run_anomaly(df_input, contamination=contamination)
         show_anomaly_chart(df_r)
-    elif df_input is not None:
-        st.warning("נדרשות לפחות 5 נקודות לניתוח חריגים")
+    else:
+        st.info("💡 חלץ קובץ TIF בלשונית 'חילוץ' — התוצאות יוצגו כאן אוטומטית.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # לשונית 3 — EDA
@@ -636,27 +608,18 @@ with tab_eda:
     st.markdown("## 📊 ניתוח נתונים")
     st.markdown("---")
 
-    eda_source = "מערך קיים"
     if "ocr_df" in st.session_state and st.session_state["ocr_df"] is not None:
-        eda_src_opt = st.radio("מקור:", ["נתונים שחולצו ✅", "מערך נתונים קיים"],
-                               horizontal=True, key="eda_src")
-        if eda_src_opt == "נתונים שחולצו ✅":
-            df_e = st.session_state["ocr_df"]
-        else:
-            df_e = None
-            eda_source = "מערך קיים"
-    else:
-        df_e = None
-
-    if df_e is None:
-        if not DATASETS:
-            st.warning("לא נמצאו קבצי נתונים")
-            st.stop()
-        sel_e = st.selectbox("בחרי מערך:", [f"מערך {k}" for k in DATASETS.keys()], key="eda_sel")
+        df_e = st.session_state["ocr_df"]
+        st.success(f"✅ מציג נתונים מחולצים — {len(df_e)} נקודות")
+    elif DATASETS:
+        sel_e = st.selectbox("בחר מערך:", [f"מערך {k}" for k in DATASETS.keys()], key="eda_sel")
         df_e  = load_csv(DATASETS[sel_e.split()[-1]])
         if df_e is None:
-            st.error("שגיאה בטעינת הנתונים")
+            st.error("שגיאה בטעינה")
             st.stop()
+    else:
+        st.info("💡 חלץ קובץ TIF בלשונית 'חילוץ' — התוצאות יוצגו כאן אוטומטית.")
+        st.stop()
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("מספר נקודות", len(df_e))
