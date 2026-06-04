@@ -556,7 +556,10 @@ def extract_with_gemini(
 - ערכים שליליים
 - שורות עם מספרי ביניים בלבד (ΔY, ΔX)
 
-העתק ערכים בדיוק כמו שכתוב. אל תמציא.
+העתק את כל הספרות בדיוק כמו שכתוב — כולל כל הספרות אחרי הנקודה העשרונית!
+דוגמה: 162251.449 ולא 162251.4 | 618729.848 ולא 618729.8
+מספר עגול: 618730 → רשום 618730.0
+אל תמציא ואל תעגל.
 החזר JSON בלבד: [{"name":"שם","Y":0.0,"X":0.0}, ...]
 אין קואורדינטות בדף זה → החזר: []"""
 
@@ -726,15 +729,20 @@ def extract_with_gemini(
         if mask.sum() > 0:
             df.loc[mask, ['Y', 'X']] = df.loc[mask, ['X', 'Y']].values
 
-    # Voting dedup — לכל שם שומר הקואורדינטה שחוזרת הכי הרבה
+    # Voting dedup — מוצא הקבוצה הנפוצה ביותר, שומר ערך מקורי מלא
     best = []
     for name, grp in df.groupby('שם נקודה', sort=False):
-        y_mode = grp['Y'].round(1).mode()
-        x_mode = grp['X'].round(1).mode()
+        # עיגול ל-1 ספרה לצורך בחירת הקבוצה בלבד
+        y_bucket = grp['Y'].round(1).mode().iloc[0] if len(grp) else grp['Y'].iloc[0]
+        x_bucket = grp['X'].round(1).mode().iloc[0] if len(grp) else grp['X'].iloc[0]
+        # מציאת שורה מקורית עם הקואורדינטה הנפוצה
+        mask = (grp['Y'].round(1) == round(float(y_bucket), 1)) & \
+               (grp['X'].round(1) == round(float(x_bucket), 1))
+        row = grp[mask].iloc[0] if mask.any() else grp.iloc[0]
         best.append({
             'שם נקודה': name,
-            'Y': float(y_mode.iloc[0] if len(y_mode) else grp['Y'].iloc[0]),
-            'X': float(x_mode.iloc[0] if len(x_mode) else grp['X'].iloc[0]),
+            'Y': float(row['Y']),   # ערך מקורי — כל הספרות העשרוניות
+            'X': float(row['X']),
         })
     return pd.DataFrame(best)
 

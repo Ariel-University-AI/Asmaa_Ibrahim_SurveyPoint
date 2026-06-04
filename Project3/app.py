@@ -677,13 +677,13 @@ def show_anomaly_chart(df_res):
 
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:
-        csv_all = df_full.to_csv(index=False).encode("utf-8-sig")
+        csv_all = df_full.to_csv(index=False, float_format='%.3f').encode("utf-8-sig")
         st.download_button("⬇️ הורד כל הנקודות — CSV", data=csv_all,
                            file_name="all_points_with_status.csv",
                            mime="text/csv", key=ck())
     if n_bad > 0:
         with col_dl2:
-            csv_bad = df_bad[["שם נקודה","Y","X"]].to_csv(index=False).encode("utf-8-sig")
+            csv_bad = df_bad[["שם נקודה","Y","X"]].to_csv(index=False, float_format='%.3f').encode("utf-8-sig")
             st.download_button("⬇️ הורד חשודות בלבד — CSV", data=csv_bad,
                                file_name="suspicious_points.csv",
                                mime="text/csv", key=ck())
@@ -839,7 +839,7 @@ with tab_ocr:
 
                 col_c, col_e = st.columns(2)
                 with col_c:
-                    csv_out = ocr_core.to_csv(index=False).encode("utf-8-sig")
+                    csv_out = ocr_core.to_csv(index=False, float_format='%.3f').encode("utf-8-sig")
                     st.download_button("⬇️ הורד CSV", data=csv_out,
                                        file_name="coordinates_extracted.csv",
                                        mime="text/csv", key=ck())
@@ -969,7 +969,7 @@ with tab_eda:
                      "Y": st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
                      "X": st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
                  })
-    csv_out = df_e.to_csv(index=False).encode("utf-8-sig")
+    csv_out = df_e.to_csv(index=False, float_format='%.3f').encode("utf-8-sig")
     st.download_button("⬇️ הורד CSV", data=csv_out,
                        file_name="data_eda.csv", mime="text/csv", key=ck())
 
@@ -1024,7 +1024,7 @@ with tab_home:
             st.markdown(f"### ✅ נקודות תקינות — {len(df_ok)}")
             st.dataframe(df_ok, use_container_width=True, height=400,
                          column_config=col_cfg, hide_index=True)
-            csv_ok = df_ok.to_csv(index=False).encode("utf-8-sig")
+            csv_ok = df_ok.to_csv(index=False, float_format='%.3f').encode("utf-8-sig")
             st.download_button("⬇️ הורד תקינות CSV", data=csv_ok,
                                file_name="valid_points.csv", mime="text/csv", key=ck())
 
@@ -1033,7 +1033,7 @@ with tab_home:
             if len(df_bad) > 0:
                 st.dataframe(df_bad, use_container_width=True, height=400,
                              column_config=col_cfg, hide_index=True)
-                csv_bad = df_bad.to_csv(index=False).encode("utf-8-sig")
+                csv_bad = df_bad.to_csv(index=False, float_format='%.3f').encode("utf-8-sig")
                 st.download_button("⬇️ הורד חשודות CSV", data=csv_bad,
                                    file_name="suspicious_points.csv",
                                    mime="text/csv", key=ck())
