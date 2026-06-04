@@ -574,14 +574,8 @@ def extract_with_gemini(
         if black_ratio < 0.01 or black_ratio > 0.85:
             pages_b64[p] = None
             continue
-        # Resize לפני שליחה — מקסימום 1200px (מאיץ Gemini פי ~2.5)
-        img = src.convert('RGB')
-        max_dim = max(img.size)
-        if max_dim > 1200:
-            ratio = 1200 / max_dim
-            img = img.resize((int(img.width * ratio), int(img.height * ratio)), Image.LANCZOS)
         buf = io.BytesIO()
-        img.save(buf, format='JPEG', quality=75)
+        src.convert('RGB').save(buf, format='JPEG', quality=80)
         pages_b64[p] = base64.b64encode(buf.getvalue()).decode()
 
     done = [0]
@@ -604,7 +598,7 @@ def extract_with_gemini(
         pts = []
         for attempt in range(3):
             try:
-                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=90)
+                resp = requests.post(API_URL, json=payload, headers=HDR, timeout=120)
                 if resp.status_code == 429:
                     wait = 15 * (attempt + 1)
                     print(f"P{p+1}: 429, wait {wait}s...")
@@ -616,7 +610,20 @@ def extract_with_gemini(
                 raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
                 s, e = raw.find('['), raw.rfind(']')
                 if s != -1 and e > s:
-                    for item in json.loads(raw[s:e+1]):
+                    try:
+                        parsed = json.loads(raw[s:e+1])
+                    except json.JSONDecodeError:
+                        # נסה לתקן JSON חלקי — חתוך בפסיק האחרון
+                        chunk = raw[s:e+1]
+                        last_comma = chunk.rfind(',')
+                        if last_comma != -1:
+                            try:
+                                parsed = json.loads(chunk[:last_comma] + ']')
+                            except Exception:
+                                parsed = []
+                        else:
+                            parsed = []
+                    for item in parsed:
                         try:
                             name = str(
                                 item.get('name') or item.get('nome') or
