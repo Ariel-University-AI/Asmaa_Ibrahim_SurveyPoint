@@ -542,7 +542,8 @@ def extract_with_gemini(
 - ITM חדש (אחרי 1994): Y (צפון) בטווח 100,000–900,000 | X (מזרח) בטווח 100,000–900,000
 - חישובים מקומיים: ערכים קטנים (עשרות עד אלפים)
 - זהה לפי הערכים שבדף ממש — אל תנחש
-- חשוב: Y תמיד העמודה המסומנת Y בטבלה — לא X!
+- חשוב מאוד: קרא כל שורה בטבלה שלמה (שם + Y + X) לפני שממשיך לשורה הבאה
+- וודא: Y וX בכל שורה לקוחים מאותה שורה בדיוק — אסור לערבב עם שורות שכנות!
 
 טבלאות שיש לחפש:
 - חשוב מצולע (traverse): עמודות Y ו-X בצד ימין
@@ -640,6 +641,23 @@ def extract_with_gemini(
                                 pts.append({'שם נקודה': name, 'Y': y, 'X': x})
                         except Exception:
                             pass
+                # תיקון מרחבי: אם נקודה רחוקה מהcluster אבל Swap יביא אותה קרוב — תקן
+                if len(pts) >= 5:
+                    ys = sorted(pt['Y'] for pt in pts)
+                    xs = sorted(pt['X'] for pt in pts)
+                    y_med = ys[len(ys)//2]
+                    x_med = xs[len(xs)//2]
+                    fixed = []
+                    for pt in pts:
+                        y, x = pt['Y'], pt['X']
+                        d_norm = abs(y - y_med) + abs(x - x_med)
+                        d_swap = abs(x - y_med) + abs(y - x_med)
+                        if d_swap < d_norm * 0.4 and d_norm > 5:
+                            fixed.append({'שם נקודה': pt['שם נקודה'], 'Y': x, 'X': y})
+                        else:
+                            fixed.append(pt)
+                    pts = fixed
+
                 elapsed = time.time() - t0
                 print(f"P{p+1}: DONE {len(pts)} pts ({elapsed:.1f}s)")
                 break
