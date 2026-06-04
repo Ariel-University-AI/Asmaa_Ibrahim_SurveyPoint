@@ -626,23 +626,24 @@ def show_anomaly_chart(df_res):
     fig = go.Figure()
     if len(df_ok):
         fig.add_trace(go.Scatter(
-            x=df_ok["Y"], y=df_ok["X"], mode="markers", name="תקין",
+            x=df_ok["X"], y=df_ok["Y"], mode="markers", name="תקין",
             marker=dict(size=7, color="#00ff88", symbol="circle",
                         line=dict(color="#00cc66", width=1)),
             text=df_ok["שם נקודה"],
-            hovertemplate="<b>%{text}</b><br>Y:%{x:.3f}<br>X:%{y:.3f}<extra></extra>",
+            hovertemplate="<b>%{text}</b><br>X:%{x:.3f}<br>Y:%{y:.3f}<extra></extra>",
         ))
     if len(df_bad):
         fig.add_trace(go.Scatter(
-            x=df_bad["Y"], y=df_bad["X"], mode="markers", name="חשוד",
+            x=df_bad["X"], y=df_bad["Y"], mode="markers", name="חשוד",
             marker=dict(size=13, color="#ff3333", symbol="x",
                         line=dict(color="#ff0000", width=2.5)),
             text=df_bad["שם נקודה"],
-            hovertemplate="<b>%{text}</b><br>Y:%{x:.3f}<br>X:%{y:.3f}<extra></extra>",
+            hovertemplate="<b>%{text}</b><br>X:%{x:.3f}<br>Y:%{y:.3f}<extra></extra>",
         ))
-    fig.update_layout(**PLOT_STYLE, height=460, showlegend=False,
-        xaxis=dict(title="Y (צפון)", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
-        yaxis=dict(title="X (מזרח)", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
+    fig.update_layout(**PLOT_STYLE, height=500, showlegend=False,
+        xaxis=dict(title="X — מזרח", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
+        yaxis=dict(title="Y — צפון", gridcolor="rgba(0,212,255,0.1)", zeroline=False,
+                   scaleanchor="x", scaleratio=1),
     )
     st.plotly_chart(fig, use_container_width=True, key=ck())
     st.markdown(
@@ -819,12 +820,13 @@ with tab_ocr:
                             "X": st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
                         })
                 with col_p:
-                    fig_o = px.scatter(ocr_core, x="Y", y="X", hover_name="שם נקודה",
+                    fig_o = px.scatter(ocr_core, x="X", y="Y", hover_name="שם נקודה",
                                        color_discrete_sequence=["#00D4FF"])
                     fig_o.update_traces(marker=dict(size=7))
-                    fig_o.update_layout(**PLOT_STYLE, height=360,
-                        xaxis=dict(title="Y", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
-                        yaxis=dict(title="X", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
+                    fig_o.update_layout(**PLOT_STYLE, height=420,
+                        xaxis=dict(title="X — מזרח", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
+                        yaxis=dict(title="Y — צפון", gridcolor="rgba(0,212,255,0.1)", zeroline=False,
+                                   scaleanchor="x", scaleratio=1),
                     )
                     st.plotly_chart(fig_o, use_container_width=True, key=ck())
 
@@ -929,12 +931,13 @@ with tab_eda:
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("### פיזור נקודות")
-        fig_sc = px.scatter(df_e, x="Y", y="X", hover_name="שם נקודה",
+        fig_sc = px.scatter(df_e, x="X", y="Y", hover_name="שם נקודה",
                             color_discrete_sequence=["#00D4FF"])
         fig_sc.update_traces(marker=dict(size=6))
-        fig_sc.update_layout(**PLOT_STYLE, height=360,
-            xaxis=dict(title="Y (צפון)", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
-            yaxis=dict(title="X (מזרח)", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
+        fig_sc.update_layout(**PLOT_STYLE, height=420,
+            xaxis=dict(title="X — מזרח", gridcolor="rgba(0,212,255,0.1)", zeroline=False),
+            yaxis=dict(title="Y — צפון", gridcolor="rgba(0,212,255,0.1)", zeroline=False,
+                       scaleanchor="x", scaleratio=1),
         )
         st.plotly_chart(fig_sc, use_container_width=True, key=ck())
 
