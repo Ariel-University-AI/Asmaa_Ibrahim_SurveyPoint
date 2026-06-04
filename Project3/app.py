@@ -238,6 +238,13 @@ hr { border-color: rgba(0,212,255,0.15) !important; }
     border-radius: 12px !important;
     padding: 16px !important;
 }
+[data-testid="stFileUploader"] label,
+[data-testid="stFileUploader"] p,
+[data-testid="stFileUploader"] span,
+[data-testid="stFileUploaderDropzone"] > div > p,
+[data-testid="stFileUploaderDropzone"] small {
+    color: #ffffff !important;
+}
 /* Fix Uploadpload — hide original text, inject clean text */
 [data-testid="stFileUploaderDropzone"] button {
     font-size: 0 !important;
@@ -458,7 +465,7 @@ with tab_ocr:
 
     st.markdown("### 📂 קובץ תיק חישובים")
     uploaded = st.file_uploader(
-        "גרורי קובץ TIF או PDF לכאן",
+        "גרירת קובץ TIF/PDF לכאן",
         type=["tif", "TIF", "tiff", "TIFF", "pdf", "PDF"],
         key="ocr_upload",
     )
