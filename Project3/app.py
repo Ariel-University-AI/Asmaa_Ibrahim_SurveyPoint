@@ -930,16 +930,18 @@ with tab_eda:
         st.stop()
 
     c1, c2, c3, c4 = st.columns(4)
-    # טווח ללא outliers — IQR × 1.5
-    def _range_no_outliers(s):
-        q1, q3 = s.quantile(0.05), s.quantile(0.95)
-        clean = s[(s >= q1) & (s <= q3)]
-        return clean.max() - clean.min() if len(clean) > 1 else s.max() - s.min()
+    # מרכז הגוש — ממוצע נקודות תקינות (ללא outliers)
+    df_clean = run_anomaly(df_e)
+    df_valid = df_clean[df_clean["pred"] == 1]
+    n_valid  = len(df_valid)
+    n_sus    = len(df_clean) - n_valid
+    avg_y    = df_valid["Y"].mean() if n_valid > 0 else df_e["Y"].median()
+    avg_x    = df_valid["X"].mean() if n_valid > 0 else df_e["X"].median()
 
     c1.metric("מספר נקודות", len(df_e))
-    c2.metric("טווח Y (מטר)", f"{_range_no_outliers(df_e['Y']):.1f}")
-    c3.metric("טווח X (מטר)", f"{_range_no_outliers(df_e['X']):.1f}")
-    c4.metric("ערכים חסרים", int(df_e.isnull().sum().sum()))
+    c2.metric("ממוצע Y — מרכז הגוש", f"{avg_y:.3f}", f"{n_valid} תקינות")
+    c3.metric("ממוצע X — מרכז הגוש", f"{avg_x:.3f}")
+    c4.metric("חשודות", n_sus)
 
     col1, col2 = st.columns(2)
     with col1:
