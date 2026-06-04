@@ -129,6 +129,12 @@ hr { border-color: rgba(0,212,255,0.15) !important; }
     border-radius: 12px !important;
     padding: 16px !important;
 }
+[data-testid="stFileUploader"] button {
+    direction: ltr !important;
+}
+[data-testid="stFileUploaderDropzone"] {
+    direction: rtl !important;
+}
 .stTextInput input {
     background: rgba(13,27,42,0.8) !important;
     border: 1px solid rgba(0,212,255,0.3) !important;
