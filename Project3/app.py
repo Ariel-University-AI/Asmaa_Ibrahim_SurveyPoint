@@ -486,9 +486,8 @@ def get_datasets():
 
 def run_anomaly(df, contamination=0.05):
     model = IsolationForest(contamination=contamination, random_state=42, n_estimators=100)
-    coords = df[["Y", "X"]].copy()
     df = df.copy()
-    df["pred"] = model.fit_predict(coords)
+    df["pred"] = model.fit_predict(df[["Y", "X"]])
     df["סטטוס"] = df["pred"].map({1: "תקין", -1: "חשוד"})
     return df
 
@@ -839,21 +838,17 @@ with tab_detect:
     st.markdown("## 🤖 זיהוי חריגים")
     st.markdown("---")
 
-    with st.expander("כיצד עובד זיהוי החריגים?", expanded=False):
-        st.markdown("""
-**Isolation Forest** — אלגוריתם בינה מלאכותית לזיהוי נקודות חריגות:
-
-- 🌳 בונה מאות עצי החלטה אקראיים על הקואורדינטות
-- 📏 נקודה **חריגה** = מבודדת בקלות (מעטים ענפים לבידוד)
-- 📍 נקודה **תקינה** = דורשת עץ עמוק יותר לבידוד
-
-**מתי נקודה תסומן כחשודה?**
-- קואורדינטות חריגות מהאשכול הגיאוגרפי הכללי
-- שגיאות כתיב בתיק החישובים
-- נקודות שנמדדו בשיטה שונה
-
-**פרמטר הרגישות:** 0.05 = 5% מהנקודות יסומנו כחשודות. הגדל לגילוי יותר שגיאות.
-        """)
+    st.markdown("""
+<div style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.2);
+border-radius:10px;padding:16px 20px;margin-bottom:16px;font-size:.9rem;color:#90e0ef;">
+<b style="color:#00D4FF;">כיצד עובד זיהוי החריגים</b><br><br>
+<b>Isolation Forest</b> — אלגוריתם בינה מלאכותית לזיהוי נקודות חריגות:<br>
+• בונה מאות עצי החלטה אקראיים על הקואורדינטות<br>
+• נקודה <b>חריגה</b> = מבודדת בקלות (מעטים ענפים)<br>
+• נקודה <b>תקינה</b> = דורשת עץ עמוק יותר לבידוד<br><br>
+<b>פרמטר הרגישות:</b> 0.05 = 5% מהנקודות יסומנו כחשודות
+</div>
+""", unsafe_allow_html=True)
 
     st.markdown("---")
     has_ocr = "ocr_df" in st.session_state and st.session_state["ocr_df"] is not None
