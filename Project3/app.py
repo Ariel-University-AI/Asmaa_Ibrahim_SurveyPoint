@@ -537,8 +537,11 @@ def run_anomaly(df, contamination=0.05):
     return df
 
 def load_api_key():
-    if "GEMINI_API_KEY" in st.secrets:
-        return st.secrets["GEMINI_API_KEY"]
+    try:
+        if "GEMINI_API_KEY" in st.secrets:
+            return st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        pass
     key_file = os.path.join(ROOT_DIR, "key.txt")
     if os.path.exists(key_file):
         with open(key_file, encoding="utf-8") as f:
