@@ -1019,15 +1019,25 @@ with tab_home:
     st.markdown("### 📋 פרטי תיק חישובים")
     if not st.session_state.get("_meta_set"):
         st.info("💡 פרטי התיק יחולצו אוטומטית מדף השער לאחר העלאת קובץ TIF בלשונית 'חילוץ'.")
+    # טעינת ברירת מחדל Data1 אם במצב דמו ועדיין לא הוגדרו ידנית
+    if st.session_state.get("_demo_mode") and not st.session_state.get("_meta_set"):
+        if not st.session_state.get("tik_num"):    st.session_state["tik_num"]   = "362"
+        if not st.session_state.get("tlr_num"):    st.session_state["tlr_num"]   = ""
+        if not st.session_state.get("tlr_year"):   st.session_state["tlr_year"]  = "1955"
+        if not st.session_state.get("gush"):       st.session_state["gush"]      = "11200"
+        if not st.session_state.get("helka"):      st.session_state["helka"]     = "1"
+        if not st.session_state.get("tik_chish"):  st.session_state["tik_chish"] = "362"
+        st.session_state["_meta_set"] = True
+
     r1c1, r1c2, r1c3 = st.columns(3)
-    with r1c1: tik_num  = st.text_input("מספר תיק",          key="tik_num",  placeholder="9546")
-    with r1c2: tlr_num  = st.text_input('מספר תל"ר',         key="tlr_num",  placeholder="989-986")
-    with r1c3: tlr_year = st.text_input('שנת תל"ר',          key="tlr_year", placeholder="2006")
+    with r1c1: tik_num  = st.text_input("מספר תיק",         key="tik_num",  placeholder="")
+    with r1c2: tlr_num  = st.text_input('מספר תל"ר',        key="tlr_num",  placeholder="")
+    with r1c3: tlr_year = st.text_input('שנת תל"ר',         key="tlr_year", placeholder="")
 
     r2c1, r2c2, r2c3 = st.columns(3)
-    with r2c1: gush      = st.text_input("גוש",               key="gush",     placeholder="3893")
-    with r2c2: helka     = st.text_input("חלקה",              key="helka",    placeholder="")
-    with r2c3: tik_chish = st.text_input("מספר תיק חישובי",   key="tik_chish",placeholder="525")
+    with r2c1: gush      = st.text_input("גוש",              key="gush",     placeholder="")
+    with r2c2: helka     = st.text_input("חלקה",             key="helka",    placeholder="")
+    with r2c3: tik_chish = st.text_input("מספר תיק חישובי",  key="tik_chish",placeholder="")
 
     fields = {"📁 מספר תיק": tik_num, '📋 מספר תל"ר': tlr_num,
               '📅 שנת תל"ר': tlr_year, "🗺️ גוש": gush,
