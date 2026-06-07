@@ -470,6 +470,7 @@ st.markdown("""
 
 # ── פונקציות ──────────────────────────────────────────────────────────────────
 
+@st.cache_data(show_spinner=False)
 def load_csv(src, is_bytes=False):
     for enc in ["utf-8-sig", "cp1255", "utf-8", "latin-1"]:
         try:
@@ -486,6 +487,7 @@ def load_csv(src, is_bytes=False):
             continue
     return None
 
+@st.cache_data(show_spinner=False)
 def get_datasets():
     result = {}
     for i in ["1", "2", "3", "4"]:
@@ -517,6 +519,7 @@ def normalize_coords(df):
             df.loc[mask, ['Y', 'X']] = df.loc[mask, ['X', 'Y']].values
     return df
 
+@st.cache_data(show_spinner=False)
 def run_anomaly(df, contamination=0.05):
     df = normalize_coords(df).copy()
     # סנן outliers קיצוניים לפני IsolationForest (מחוץ ל-4 סטיות תקן)
@@ -704,7 +707,17 @@ with tab_ocr:
     st.markdown("העלאת קובץ TIF/PDF של תיק חישובים — המערכת מחלצת את כל הקואורדינטות אוטומטית ומזהה נקודות חשודות.")
 
     if st.session_state.get("_demo_mode"):
-        st.info("📊 **מצב דוגמה** — מוצגים נתוני Data1 (241 נקודות). העלה קובץ TIF משלך להחלפה.")
+        st.markdown("""
+<div style="background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(123,47,190,0.1));
+border:1px solid rgba(0,212,255,0.4);border-radius:12px;padding:16px 20px;margin-bottom:8px;">
+<b style="color:#00D4FF;font-size:1.05rem;">📊 דוגמה ברירת מחדל — Data1 (תיק חישובים, 1955)</b><br><br>
+<span style="color:#90e0ef;font-size:0.9rem;">
+✅ &nbsp;241 נקודות מדידה נטענו אוטומטית בכניסה לאפליקציה<br>
+✅ &nbsp;כל הלשוניות מציגות נתונים מיידית — ללא צורך בהעלאה<br>
+✅ &nbsp;כדי לנתח תיק חדש — העלה קובץ TIF למטה
+</span>
+</div>
+""", unsafe_allow_html=True)
 
     st.markdown("---")
 
