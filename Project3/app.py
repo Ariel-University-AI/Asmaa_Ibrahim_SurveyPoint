@@ -537,6 +537,8 @@ def run_anomaly(df, contamination=0.05):
     return df
 
 def load_api_key():
+    if "GEMINI_API_KEY" in st.secrets:
+        return st.secrets["GEMINI_API_KEY"]
     key_file = os.path.join(ROOT_DIR, "key.txt")
     if os.path.exists(key_file):
         with open(key_file, encoding="utf-8") as f:
@@ -1072,7 +1074,7 @@ with tab_home:
 # ── תחתית ─────────────────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("""
-<div style="text-align:center;color:#1e2d40;font-size:0.85rem;
+<div style="text-align:center;color:rgba(144,224,239,0.5);font-size:0.85rem;
 border-top:1px solid rgba(0,212,255,0.1);padding-top:16px">
     📐 SurveyPoint © 2026 | קורס 444210 גאודזיה מתמטית | אוניברסיטת אריאל
 </div>
