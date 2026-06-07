@@ -598,14 +598,20 @@ COLORS    = ["#00D4FF", "#ffd700", "#00ff88", "#ff6b6b"]
 
 # ── דוגמה ברירת מחדל — טוען Data1 בכניסה ראשונה ──────────────────────────────
 if "ocr_df" not in st.session_state:
-    # טוען קובץ מחולץ מראש אם קיים, אחרת ייחוס
-    _ext = os.path.join(ROOT_DIR, "coordinates_extracted_1.csv")
-    _default = _ext if os.path.exists(_ext) else os.path.join(ROOT_DIR, "DATA", "1", "coordinates_1.CSV")
-    if os.path.exists(_default):
-        _df = load_csv(_default)
-        if _df is not None:
-            st.session_state["ocr_df"] = _df
-            st.session_state["_demo_mode"] = True
+    _candidates = [
+        os.path.join(ROOT_DIR, "coordinates_extracted_1.csv"),
+        os.path.join(ROOT_DIR, "DATA", "1", "coordinates_1.CSV"),
+        os.path.join(ROOT_DIR, "DATA", "1", "coordinates_1.csv"),
+        os.path.join(BASE_DIR, "DATA", "1", "coordinates_1.CSV"),
+        os.path.join(BASE_DIR, "DATA", "1", "coordinates_1.csv"),
+    ]
+    for _path in _candidates:
+        if os.path.exists(_path):
+            _df = load_csv(_path)
+            if _df is not None:
+                st.session_state["ocr_df"] = _df
+                st.session_state["_demo_mode"] = True
+                break
 
 PLOT_STYLE = dict(
     plot_bgcolor="rgba(10,14,26,0.95)",
