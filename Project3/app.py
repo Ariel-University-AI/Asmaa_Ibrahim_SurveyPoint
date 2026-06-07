@@ -596,7 +596,9 @@ COLORS    = ["#00D4FF", "#ffd700", "#00ff88", "#ff6b6b"]
 
 # ── דוגמה ברירת מחדל — טוען Data1 בכניסה ראשונה ──────────────────────────────
 if "ocr_df" not in st.session_state:
-    _default = os.path.join(ROOT_DIR, "DATA", "1", "coordinates_1.CSV")
+    # טוען קובץ מחולץ מראש אם קיים, אחרת ייחוס
+    _ext = os.path.join(ROOT_DIR, "coordinates_extracted_1.csv")
+    _default = _ext if os.path.exists(_ext) else os.path.join(ROOT_DIR, "DATA", "1", "coordinates_1.CSV")
     if os.path.exists(_default):
         _df = load_csv(_default)
         if _df is not None:
