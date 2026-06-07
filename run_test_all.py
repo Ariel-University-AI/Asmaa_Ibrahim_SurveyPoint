@@ -67,6 +67,16 @@ for ds, info in DATASETS.items():
     ext.columns = ["name","Y","X"]
     ext["name"] = ext["name"].astype(str).str.strip()
 
+    # תיקון Y/X swap (כמו normalize_coords באפליקציה)
+    y_med = ext["Y"].median(); x_med = ext["X"].median()
+    if y_med > x_med * 1.5:
+        ext[["Y","X"]] = ext[["X","Y"]].values
+        y_med, x_med = x_med, y_med
+    if x_med > 400_000:
+        mask = ext["Y"] > ext["X"]
+        ext.loc[mask, ["Y","X"]] = ext.loc[mask, ["X","Y"]].values
+
+    # תיקון offset לקואורדינטות מקומיות
     y_off = x_off = 0
     if ext["Y"].median() < 10000 and orig["Y"].median() > 10000:
         y_off = round(orig["Y"].median()/1000)*1000 - round(ext["Y"].median()/1000)*1000
