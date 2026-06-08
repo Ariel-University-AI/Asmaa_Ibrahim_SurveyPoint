@@ -2,10 +2,9 @@ pandas
 streamlit
 plotly
 scikit-learn
-ezdxf
-joblib
-openpyxl
-easyocr
 Pillow
 numpy
+requests
 pdfplumber
+openpyxl
+joblib
