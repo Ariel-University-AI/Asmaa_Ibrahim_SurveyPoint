@@ -663,7 +663,7 @@ Y = צפון, X = מזרח — אל תחליף לעולם!
                 break
         return p, pts, has_headers
 
-    BATCH = 2
+    BATCH = 5
     results = {}
     result_meta = {}  # p -> has_headers
 
@@ -673,7 +673,11 @@ Y = צפון, X = מזרח — אל תחליף לעולם!
         bt0 = time.time()
         print(f"\n-- Batch {batch_start//BATCH+1} -- pages {[p+1 for p in batch]}")
         with ThreadPoolExecutor(max_workers=BATCH) as pool:
-            futures = {pool.submit(_send_page, p): p for p in batch}
+            futures = {}
+            for i, p in enumerate(batch):
+                futures[pool.submit(_send_page, p)] = p
+                if i < len(batch) - 1:
+                    time.sleep(0.8)   # פיזור בקשות — מונע 429
             for fut in as_completed(futures):
                 p, pts, has_hdr = fut.result()
                 results[p] = pts
