@@ -15,8 +15,11 @@ import pandas as pd
 from PIL import Image
 from collections import defaultdict
 
-import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+try:
+    import pytesseract
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+except ImportError:
+    pytesseract = None
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  הכנת תמונה
