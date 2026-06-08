@@ -1,6 +1,6 @@
 ## 🚀 Live Demo
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://asmaaibrahimsurveypoint-p9x4fjo4vdz8ypszhxa3e8.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://surveypoint-asmaa-ibrahim.streamlit.app)
 
 # 📐 SurveyPoint — חילוץ קואורדינטות מתיקי חישובים וזיהוי שגיאות מדידה
 
@@ -125,8 +125,8 @@
 - מסמן נקודות חשודות 🟡 שעלולות להיות טעויות קריאה
 
 **תוצאות חילוץ:**
-- Data1 (41 דפים, 1955): **81.7%** דיוק ב±1.5מ
-- Data2 (15 דפים): **90.5%** דיוק ב±5ס"מ
+- Data1 (41 דפים, 1955): **81.3%** דיוק ב±0.1מ
+- Data2 (15 דפים): **90.5%** דיוק ב±0.1מ
 
 ---
 
