@@ -527,47 +527,41 @@ def extract_with_gemini(
                f"{GEMINI_MODEL}:generateContent{QP}")
     print(f"Model: {GEMINI_MODEL}")
 
-    PROMPT = """זהו דף מתיק חישובים הנדסי של מודד מוסמך בישראל.
+    PROMPT = """זהו דף מתיק חישובים הנדסי ישראלי.
 
-משימה: חלץ את כל הנקודות שיש להן שם נקודה + קואורדינטות Y ו-X.
+חלץ קואורדינטות מכל טבלה בדף.
 
-כלל בסיסי — קואורדינטות בתיק ישראלי:
-- Y = הערך המופיע בעמודה המסומנת Y בטבלה (קרא בדיוק מהעמודה הנכונה)
-- X = הערך המופיע בעמודה המסומנת X בטבלה
-- אל תחליף Y ו-X לעולם — קרא מהעמודה הנכונה בלבד!
+═══ זיהוי עמודות ═══
+Y / X | E או East (=X) / N או North (=Y) | א / מ
+Y = צפון, X = מזרח — אל תחליף לעולם!
+אם אין כותרות: ITM — Y=100k-300k, X=400k-900k. שני ערכים זהי טווח: הקטן=Y, הגדול=X.
 
-כללי שמות נקודה תקינים:
-- מספרים: 1, 15, 4318, 1397W
-- מספר + אות/סימן: 15A, 3B, 457M, AF1540, 2575X
-- עד 8 תווים בלבד
-- אסור: עברית, שמות ארוכים מ-8 תווים
+═══ כללי שמות ═══
+עד 8 תווים, מספרים + אותיות לועזיות. אסור: עברית, ΔY/ΔX, ערכים שליליים, סיכומים.
 
-סוגי קואורדינטות בישראל:
-- רשת ישנה: Y בטווח 100,000–300,000 | X בטווח 500,000–900,000
-- ITM חדש: Y ו-X בטווח 100,000–900,000
-- קואורדינטות מקומיות: ערכים קטנים (עשרות עד אלפים)
-- קרא לפי הערכים בדף — אל תנחש
+═══ סיווג נקודות — חובה לכל נקודה ═══
+"known" = נקודת ייחוס ברשת: 831H, 833HL, X1, X2, X1R — בד"כ בראש הדף
+"old"   = נקודה מסקר קודם — מסומנת "ישן"/"קודם" בדף, או ברשימה נפרדת
+"new"   = כל שאר הנקודות (ברירת מחדל)
 
-טבלאות שיש לחפש:
-- חשוב מצולע (traverse): עמודות Y ו-X בצד ימין
-- חשוב קואורדינטות נקודות בינים: עמודות A/Y ו-A/X
-- חשוב שטחים: עמודות שם נקודה, Y, X
+═══ דיוק ═══
+3 ספרות אחרי הנקודה. 618730 → 618730.000
 
-קרא כל שורה שלמה (שם + Y + X) לפני שממשיך — אסור לערבב שורות שכנות!
+החזר JSON בלבד:
+{"has_headers": true, "points": [
+  {"name":"831H","Y":0.0,"X":0.0,"type":"known"},
+  {"name":"15",  "Y":0.0,"X":0.0,"type":"new"}
+]}
+אין קואורדינטות → {"has_headers": false, "points": []}"""
 
-אסור לכלול:
-- ערכי סיכום: 2A=, A=, סך הכל
-- שורות שבהן Y ≈ X (הפרש קטן מ-1)
-- ערכים שליליים
-- שורות עם מספרי ביניים בלבד (ΔY, ΔX)
+    PROMPT_CONTINUATION = """זהו דף המשך של טבלת קואורדינטות — אין כותרות עמודות בדף זה.
 
-חובה: העתק כל מספר בדיוק — 3 ספרות אחרי הנקודה העשרונית!
-נכון: 619721.982 | 162251.449 | 160524.629
-שגוי: 619721.98 | 162251.4
-מספר עגול: 618730 → 618730.000
+הטבלה התחילה בדף קודם. חלץ לפי אותו סדר עמודות: שם נקודה | Y (צפון) | X (מזרח).
+טווחי ITM: Y=100k-300k, X=400k-900k. דיוק: 3 ספרות.
+סיווג: known/old/new כרגיל.
 
-החזר JSON בלבד: [{"name":"שם","Y":0.0,"X":0.0}, ...]
-אין קואורדינטות בדף זה → החזר: []"""
+החזר JSON: {"has_headers": false, "points": [{"name":"שם","Y":0.0,"X":0.0,"type":"new"}]}
+אין נתונים → {"has_headers": false, "points": []}"""
 
     # טען כל הדפים לזיכרון (PIL לא thread-safe ל-seek)
     src = Image.open(io.BytesIO(tif_bytes))
@@ -616,55 +610,57 @@ def extract_with_gemini(
                     print(f"P{p+1}: HTTP {resp.status_code}")
                     break   # don't retry on non-429 errors
                 raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
-                s, e = raw.find('['), raw.rfind(']')
-                if s != -1 and e > s:
+                # נסה לפרסר כ-dict (פורמט חדש) או כ-list (פורמט ישן)
+                has_headers = True
+                point_list = []
+                try:
+                    ds, de = raw.find('{'), raw.rfind('}')
+                    if ds != -1 and de > ds:
+                        obj = json.loads(raw[ds:de+1])
+                        has_headers = obj.get('has_headers', True)
+                        point_list  = obj.get('points', [])
+                except Exception:
+                    pass
+                if not point_list:
+                    ls, le = raw.find('['), raw.rfind(']')
+                    if ls != -1 and le > ls:
+                        try: point_list = json.loads(raw[ls:le+1])
+                        except Exception: point_list = []
+
+                TYPE_HE = {'known': 'ידועה', 'old': 'ישנה', 'new': 'חדשה'}
+                for item in point_list:
                     try:
-                        parsed = json.loads(raw[s:e+1])
-                    except json.JSONDecodeError:
-                        chunk = raw[s:e+1]
-                        last_comma = chunk.rfind(',')
-                        try:
-                            parsed = json.loads(chunk[:last_comma] + ']') if last_comma != -1 else []
-                        except Exception:
-                            parsed = []
-                    for item in parsed:
-                        try:
-                            name = str(
-                                item.get('name') or item.get('nome') or
-                                item.get('שם') or item.get('point') or ''
-                            ).strip()
-                            if not name or len(name) > 8:
-                                continue
-                            if not re.match(r'^[0-9A-Za-z]{1,8}$', name):
-                                continue
-                            y = float(str(item.get('Y', item.get('y', 0))).replace(',', '.'))
-                            x = float(str(item.get('X', item.get('x', 0))).replace(',', '.'))
-                            if 1000 <= y < 10000:
-                                y = float(str(y)[1:])
-                            if 1000 <= x < 10000:
-                                x = float(str(x)[1:])
-                            # סנן Y≈X רק לקואורדינטות מקומיות (לא ITM מלא)
-                            if y < 10000 and abs(y - x) < 1:
-                                continue
-                            if name and y > 0 and x > 0:
-                                pts.append({'שם נקודה': name, 'Y': y, 'X': x})
-                        except Exception:
-                            pass
+                        name = str(item.get('name') or item.get('nome') or
+                                   item.get('שם') or item.get('point') or '').strip()
+                        if not name or len(name) > 8: continue
+                        if not re.match(r'^[0-9A-Za-z]{1,8}$', name): continue
+                        y = float(str(item.get('Y', item.get('y', 0))).replace(',', '.'))
+                        x = float(str(item.get('X', item.get('x', 0))).replace(',', '.'))
+                        if 1000 <= y < 10000: y = float(str(y)[1:])
+                        if 1000 <= x < 10000: x = float(str(x)[1:])
+                        if y < 10000 and abs(y - x) < 1: continue
+                        if not (name and y > 0 and x > 0): continue
+                        pt = item.get('type', 'new')
+                        if pt not in TYPE_HE: pt = 'new'
+                        pts.append({'שם נקודה': name, 'Y': y, 'X': x,
+                                    'סוג': TYPE_HE[pt]})
+                    except Exception:
+                        pass
                 elapsed = time.time() - t0
-                print(f"P{p+1}: DONE {len(pts)} pts ({elapsed:.1f}s)")
+                print(f"P{p+1}: DONE {len(pts)} pts ({elapsed:.1f}s)"
+                      + ("" if has_headers else " [no-header]"))
                 break
             except requests.exceptions.Timeout:
                 print(f"P{p+1}: timeout ({attempt+1}/2)")
-                if attempt == 0:
-                    time.sleep(3)  # brief wait before retry
-                # no retry after 2nd timeout
+                if attempt == 0: time.sleep(3)
             except Exception as ex:
                 print(f"P{p+1} err: {ex}")
                 break
-        return p, pts
+        return p, pts, has_headers
 
     BATCH = 5
     results = {}
+    result_meta = {}  # p -> has_headers
 
     # ── עובר ראשון ────────────────────────────────────────────────────────────
     for batch_start in range(0, n_pages, BATCH):
@@ -674,8 +670,9 @@ def extract_with_gemini(
         with ThreadPoolExecutor(max_workers=BATCH) as pool:
             futures = {pool.submit(_send_page, p): p for p in batch}
             for fut in as_completed(futures):
-                p, pts = fut.result()
+                p, pts, has_hdr = fut.result()
                 results[p] = pts
+                result_meta[p] = has_hdr
                 done[0] += 1
                 if progress_cb:
                     progress_cb(done[0], n_pages)
@@ -683,9 +680,8 @@ def extract_with_gemini(
         if batch_start + BATCH < n_pages:
             time.sleep(1)
 
-    # ── Adaptive Double-Pass: ריצה שנייה רק לדפים גדולים עם 0 נקודות ───────
-    # קריטריון: דף 0 נקודות + גדול מ-400KB (סימן לתוכן אמיתי, לא דף ריק)
-    MIN_SIZE_RETRY = 400 * 1024 // 4 * 3  # ~400KB decoded ≈ 533KB base64
+    # ── Adaptive retry: דפים גדולים עם 0 נקודות ────────────────────────────
+    MIN_SIZE_RETRY = 400 * 1024 // 4 * 3
     retry_pages = [p for p in range(n_pages)
                    if len(results.get(p, [])) == 0
                    and pages_b64.get(p) is not None
@@ -700,12 +696,55 @@ def extract_with_gemini(
                 with ThreadPoolExecutor(max_workers=BATCH) as pool:
                     futures = {pool.submit(_send_page, pp): pp for pp in retry_batch}
                     for fut in as_completed(futures):
-                        pp, pts = fut.result()
-                        if pts:   # רק אם מצא משהו בריצה השנייה
+                        pp, pts, has_hdr = fut.result()
+                        if pts:
                             results[pp] = pts
+                            result_meta[pp] = has_hdr
                             print(f"  Retry P{pp+1}: {len(pts)} pts recovered")
                 retry_batch = []
                 time.sleep(1)
+
+    # ── Continuation pass: דפי המשך ללא כותרות שעדיין ריקים ────────────────
+    continuation_pages = [
+        p for p in range(n_pages)
+        if not result_meta.get(p, True)
+        and len(results.get(p, [])) == 0
+        and pages_b64.get(p) is not None
+    ]
+    if continuation_pages:
+        print(f"\n-- Continuation pass: {len(continuation_pages)} header-less pages --")
+        for p in continuation_pages:
+            payload_c = {"contents": [{"parts": [
+                {"inline_data": {"mime_type": "image/jpeg", "data": pages_b64[p]}},
+                {"text": PROMPT_CONTINUATION}
+            ]}]}
+            try:
+                resp = requests.post(API_URL, json=payload_c, headers=HDR, timeout=70)
+                if resp.status_code == 200:
+                    raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
+                    ds, de = raw.find('{'), raw.rfind('}')
+                    if ds != -1:
+                        obj = json.loads(raw[ds:de+1])
+                        pts_c = []
+                        TYPE_HE = {'known':'ידועה','old':'ישנה','new':'חדשה'}
+                        for item in obj.get('points', []):
+                            try:
+                                name = str(item.get('name','')).strip()
+                                if not name or len(name) > 8: continue
+                                if not re.match(r'^[0-9A-Za-z]{1,8}$', name): continue
+                                y = float(str(item.get('Y',0)).replace(',','.'))
+                                x = float(str(item.get('X',0)).replace(',','.'))
+                                if y > 0 and x > 0:
+                                    pt = item.get('type','new')
+                                    pts_c.append({'שם נקודה': name, 'Y': y, 'X': x,
+                                                  'סוג': TYPE_HE.get(pt,'חדשה')})
+                            except Exception: pass
+                        if pts_c:
+                            results[p] = pts_c
+                            print(f"  Continuation P{p+1}: {len(pts_c)} pts recovered")
+            except Exception as ex:
+                print(f"  Continuation P{p+1} err: {ex}")
+            time.sleep(4)
 
     # אסוף בסדר עמודים
     all_points = [pt for p in range(n_pages) for pt in results.get(p, [])]
@@ -737,19 +776,21 @@ def extract_with_gemini(
 
     # Voting dedup — מוצא הקבוצה הנפוצה ביותר, שומר ערך מקורי מלא
     best = []
+    has_sug = 'סוג' in df.columns
     for name, grp in df.groupby('שם נקודה', sort=False):
-        # עיגול ל-1 ספרה לצורך בחירת הקבוצה בלבד
         y_bucket = grp['Y'].round(1).mode().iloc[0] if len(grp) else grp['Y'].iloc[0]
         x_bucket = grp['X'].round(1).mode().iloc[0] if len(grp) else grp['X'].iloc[0]
-        # מציאת שורה מקורית עם הקואורדינטה הנפוצה
         mask = (grp['Y'].round(1) == round(float(y_bucket), 1)) & \
                (grp['X'].round(1) == round(float(x_bucket), 1))
         row = grp[mask].iloc[0] if mask.any() else grp.iloc[0]
-        best.append({
+        entry = {
             'שם נקודה': name,
             'Y': round(float(row['Y']), 3),
             'X': round(float(row['X']), 3),
-        })
+        }
+        if has_sug:
+            entry['סוג'] = row.get('סוג', 'חדשה')
+        best.append(entry)
     return pd.DataFrame(best)
 
 

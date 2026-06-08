@@ -638,17 +638,43 @@ def show_anomaly_chart(df_res):
     n_ok    = (df_res["pred"] == 1).sum()
     n_bad   = (df_res["pred"] == -1).sum()
     pct     = round(n_ok / n_total * 100, 1)
+    has_sug = "סוג" in df_res.columns
+    n_new   = (df_res["סוג"] == "חדשה").sum() if has_sug else n_total
+    n_old   = (df_res["סוג"] == "ישנה").sum()  if has_sug else 0
+    n_known = (df_res["סוג"] == "ידועה").sum() if has_sug else 0
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("📍 סה״כ נקודות", n_total)
-    c2.metric("✅ תקינות",       n_ok)
-    c3.metric("⚠️ חשודות",       n_bad)
-    c4.metric("🎯 אחוז תקינות", f"{pct}%")
+    if has_sug:
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("📍 סה״כ",    n_total)
+        c2.metric("🟢 חדשות",   n_new)
+        c3.metric("🟡 ישנות",   n_old)
+        c4.metric("🔵 ידועות",  n_known)
+        c5.metric("⚠️ חשודות",  n_bad)
+    else:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("📍 סה״כ נקודות", n_total)
+        c2.metric("✅ תקינות",       n_ok)
+        c3.metric("⚠️ חשודות",       n_bad)
+        c4.metric("🎯 אחוז תקינות", f"{pct}%")
 
     df_ok  = df_res[df_res["pred"] == 1]
     df_bad = df_res[df_res["pred"] == -1]
     fig = go.Figure()
-    if len(df_ok):
+
+    # גרף לפי סוג נקודה אם קיים
+    if has_sug and len(df_ok):
+        COLOR_MAP = {'חדשה': '#00ff88', 'ישנה': '#FFD700', 'ידועה': '#00D4FF'}
+        for sug, color in COLOR_MAP.items():
+            df_s = df_ok[df_ok["סוג"] == sug]
+            if len(df_s):
+                fig.add_trace(go.Scatter(
+                    x=df_s["Y"], y=df_s["X"], mode="markers", name=sug,
+                    marker=dict(size=7, color=color, symbol="circle",
+                                line=dict(color=color, width=1)),
+                    text=df_s["שם נקודה"],
+                    hovertemplate="<b>%{text}</b><br>Y:%{x:.3f}<br>X:%{y:.3f}<extra></extra>",
+                ))
+    elif len(df_ok):
         fig.add_trace(go.Scatter(
             x=df_ok["Y"], y=df_ok["X"], mode="markers", name="תקין",
             marker=dict(size=7, color="#00ff88", symbol="circle",
@@ -677,18 +703,18 @@ def show_anomaly_chart(df_res):
 
     # טבלה מלאה עם עמודת סטטוס
     st.markdown("### 📋 טבלת כל הקואורדינטות")
-    df_full = df_res[["שם נקודה", "Y", "X", "סטטוס"]].copy().reset_index(drop=True)
-    st.dataframe(
-        df_full,
-        use_container_width=True,
-        height=400,
-        column_config={
-            "Y":      st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
-            "X":      st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
-            "סטטוס": st.column_config.TextColumn("סטטוס", width="medium"),
-        },
-        hide_index=True,
-    )
+    show_cols = ["שם נקודה", "Y", "X"]
+    if has_sug: show_cols.append("סוג")
+    show_cols.append("סטטוס")
+    df_full = df_res[[c for c in show_cols if c in df_res.columns]].copy().reset_index(drop=True)
+    col_cfg2 = {
+        "Y":      st.column_config.NumberColumn("Y (צפון)", format="%.3f"),
+        "X":      st.column_config.NumberColumn("X (מזרח)", format="%.3f"),
+        "סטטוס": st.column_config.TextColumn("סטטוס", width="medium"),
+    }
+    if has_sug: col_cfg2["סוג"] = st.column_config.TextColumn("סוג", width="small")
+    st.dataframe(df_full, use_container_width=True, height=400,
+                 column_config=col_cfg2, hide_index=True)
 
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:
@@ -820,8 +846,8 @@ border:1px solid rgba(0,212,255,0.4);border-radius:12px;padding:16px 20px;margin
 
             elapsed = __import__("time").time() - t_start
 
-            core_cols = ["שם נקודה", "Y", "X"]
-            ocr_core = df_ocr[core_cols] if all(c in df_ocr.columns for c in core_cols) else df_ocr
+            core_cols = ["שם נקודה", "Y", "X"] + (["סוג"] if "סוג" in df_ocr.columns else [])
+            ocr_core = df_ocr[[c for c in core_cols if c in df_ocr.columns]]
             st.session_state["ocr_df"] = ocr_core if len(ocr_core) > 0 else None
             st.session_state["_demo_mode"] = False
 
