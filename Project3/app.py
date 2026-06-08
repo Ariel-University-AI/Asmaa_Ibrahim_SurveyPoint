@@ -951,9 +951,13 @@ border-radius:10px;padding:16px 20px;margin-bottom:16px;font-size:.9rem;color:#9
         with col_info:
             st.success(f"✅ {len(df_input)} נקודות מוכנות לניתוח")
         with col_slider:
-            contamination = st.slider(
+            st.caption("🎯 **כוון את רמת הרגישות לפי סוג התיק שלך:**  \n"
+                   "0.01 = תיק חדש מודפס, מעט שגיאות צפויות  \n"
+                   "0.05 = ברירת מחדל מומלצת  \n"
+                   "0.10+ = תיק ישן עם כתב יד, שגיאות רבות צפויות")
+        contamination = st.slider(
                 "רגישות לחריגים", 0.01, 0.20, 0.05, 0.01, key="det_cont",
-                help="ערך נמוך = מחמיר יותר | ערך גבוה = מגלה יותר חשודות")
+                help="ערך נמוך = מחמיר יותר, רק חריגים קיצוניים | ערך גבוה = מגלה יותר חשודות")
         st.caption("💡 שנה את הרגישות לראות כיצד הדגם מסווג מחדש את הנקודות")
         df_r = run_anomaly(df_input, contamination=contamination)
         show_anomaly_chart(df_r)
