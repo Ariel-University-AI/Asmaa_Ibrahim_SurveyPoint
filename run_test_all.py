@@ -93,11 +93,14 @@ for ds, info in DATASETS.items():
     good = sum(1 for n in matched
                if abs(od[n][0]-ed[n][0]) < TOL and abs(od[n][1]-ed[n][1]) < TOL)
 
-    pct = good/len(orig)*100
-    results[ds] = {"good": good, "total": len(orig), "pct": pct,
+    pct_of_ref     = good/len(orig)*100
+    pct_of_matched = good/len(matched)*100 if matched else 0
+    results[ds] = {"good": good, "total": len(orig), "matched": len(matched),
+                   "pct": pct_of_ref, "pct_m": pct_of_matched,
                    "extracted": len(df_ext), "time": elapsed, "missing": len(missing)}
 
-    print(f"SCORE: {good}/{len(orig)} = {pct:.1f}%  (TOL={TOL}m)")
+    print(f"SCORE (מתוך ייחוס):  {good}/{len(orig)} = {pct_of_ref:.1f}%  (TOL={TOL}m)")
+    print(f"SCORE (מתוך משותף): {good}/{len(matched)} = {pct_of_matched:.1f}%  (TOL={TOL}m)")
     if missing:
         print(f"Missing: {sorted(missing)[:10]}")
 
@@ -105,12 +108,15 @@ print(f"\n{'='*50}")
 print(f"SUMMARY (TOL={TOL}m)")
 print(f"{'='*50}")
 for ds, r in results.items():
-    bar = "█" * int(r["pct"]/5)
-    print(f"Data{ds}: {r['good']:3d}/{r['total']:3d} = {r['pct']:5.1f}%  {bar}  ({r['time']:.0f}s)")
+    bar = "█" * int(r["pct_m"]/5)
+    print(f"Data{ds}: {r['good']:3d}/{r['matched']:3d} = {r['pct_m']:5.1f}% (מתוך משותף)  "
+          f"{r['good']:3d}/{r['total']:3d} = {r['pct']:5.1f}% (מתוך ייחוס)  {bar}  ({r['time']:.0f}s)")
 
 total = sum(r["good"] for r in results.values())
-denom = sum(r["total"] for r in results.values())
-print(f"\nOVERALL: {total}/{denom} = {total/denom*100:.1f}%")
+denom = sum(r["matched"] for r in results.values())
+denom_ref = sum(r["total"] for r in results.values())
+print(f"\nOVERALL (מתוך משותף): {total}/{denom} = {total/denom*100:.1f}%")
+print(f"OVERALL (מתוך ייחוס): {total}/{denom_ref} = {total/denom_ref*100:.1f}%")
 print(f"TOTAL TIME: {(time.time()-total_start)/60:.1f} min")
 print(f"\nTIP: הריצי שוב כדי לשפר — Gemini משתנה בין ריצות.")
 print(f"CSVs saved: " + " | ".join(f"coordinates_extracted_{ds}.csv" for ds in results))
