@@ -15,11 +15,7 @@ import pandas as pd
 from PIL import Image
 from collections import defaultdict
 
-try:
-    import pytesseract
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-except ImportError:
-    pytesseract = None
+pytesseract = None  # Tesseract not used on cloud — Gemini only
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  הכנת תמונה
