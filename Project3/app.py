@@ -957,24 +957,21 @@ border-radius:10px;padding:16px 20px;margin-bottom:16px;font-size:.9rem;color:#9
                    "0.10+ = תיק ישן עם כתב יד, שגיאות רבות צפויות")
         st.markdown("""
 <style>
-[data-testid="stSlider"] [data-testid="stTickBarMin"],
-[data-testid="stSlider"] [data-testid="stTickBarMax"] {
-    display: none !important;
-}
+div[data-testid="stSlider"] > div > div > div:first-child,
+div[data-testid="stSlider"] > div > div > div:last-child,
+div[data-testid="stSlider"] p { font-size:0 !important; }
 </style>
 """, unsafe_allow_html=True)
         contamination = st.slider(
                 "רגישות לחריגים", 0.01, 0.20, 0.05, 0.01, key="det_cont",
                 help="ערך נמוך = מחמיר יותר | ערך גבוה = מגלה יותר חשודות")
-        col_min, col_val, col_max = st.columns([1, 2, 1])
-        with col_min:
-            st.caption("0.01")
-        with col_val:
-            st.markdown(f"<div style='text-align:center;color:#90e0ef;font-size:0.85rem;'>ערך נבחר: <b style='color:#00D4FF'>{contamination:.2f}</b></div>",
-                        unsafe_allow_html=True)
-        with col_max:
-            st.markdown("<div style='text-align:left;color:#90e0ef;font-size:0.85rem;'>0.20</div>",
-                        unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='display:flex;justify-content:space-between;direction:ltr;"
+            f"font-size:0.82rem;color:#90e0ef;margin-top:-8px;'>"
+            f"<span>0.01</span>"
+            f"<span>ערך נבחר: <b style='color:#00D4FF'>{contamination:.2f}</b></span>"
+            f"<span>0.20</span></div>",
+            unsafe_allow_html=True)
         st.caption("💡 שנה את הרגישות לראות כיצד הדגם מסווג מחדש את הנקודות")
         df_r = run_anomaly(df_input, contamination=contamination)
         show_anomaly_chart(df_r)
