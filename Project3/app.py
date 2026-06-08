@@ -602,11 +602,11 @@ COLORS    = ["#00D4FF", "#ffd700", "#00ff88", "#ff6b6b"]
 # ── דוגמה ברירת מחדל — טוען Data1 בכניסה ראשונה ──────────────────────────────
 if "ocr_df" not in st.session_state:
     _candidates = [
-        os.path.join(ROOT_DIR, "coordinates_extracted_1.csv"),
         os.path.join(ROOT_DIR, "DATA", "1", "coordinates_1.CSV"),
         os.path.join(ROOT_DIR, "DATA", "1", "coordinates_1.csv"),
         os.path.join(BASE_DIR, "DATA", "1", "coordinates_1.CSV"),
         os.path.join(BASE_DIR, "DATA", "1", "coordinates_1.csv"),
+        os.path.join(ROOT_DIR, "coordinates_extracted_1.csv"),
     ]
     for _path in _candidates:
         if os.path.exists(_path):
