@@ -837,7 +837,8 @@ border:1px solid rgba(0,212,255,0.4);border-radius:12px;padding:16px 20px;margin
                     elif gemini_key:
                         df_ocr = extract_with_gemini(file_bytes, api_key=gemini_key, progress_cb=cb)
                     else:
-                        df_ocr = extract_from_tif(file_bytes, progress_cb=cb)
+                        st.error("נדרש Gemini API Key לחילוץ קובץ TIF — הכניסי Key בשדה למעלה.")
+                        st.stop()
                     prog.progress(100)
                     stat.empty()
                 except Exception as e:
