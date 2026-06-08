@@ -590,10 +590,11 @@ Y = צפון, X = מזרח — אל תחליף לעולם!
     def _send_page(p):
         img_b64 = pages_b64.get(p)
         if img_b64 is None:
-            return p, []
+            return p, [], True
 
         t0 = time.time()
         offset = t0 - t_global
+        has_headers = True   # ברירת מחדל — מאותחל לפני כל retry
         print(f"P{p+1}: START (+{offset:.1f}s, {len(img_b64)//1024}KB)")
 
         payload = {"contents": [{"parts": [
