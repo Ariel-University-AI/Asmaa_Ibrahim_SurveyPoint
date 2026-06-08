@@ -4,10 +4,10 @@
 
 ## 📸 Screenshots
 
-![Home](screenshots/home.png)
-![Anomaly Detection](screenshots/anomaly.png)
-![EDA](screenshots/eda.png)
-![Extraction Results](screenshots/extraction.png)
+![Home](../screenshots/home.png)
+![Anomaly Detection](../screenshots/anomaly.png)
+![EDA](../screenshots/eda.png)
+![Extraction Results](../screenshots/extraction.png)
 
 # 📐 SurveyPoint — חילוץ קואורדינטות מתיקי חישובים וזיהוי שגיאות מדידה
 
