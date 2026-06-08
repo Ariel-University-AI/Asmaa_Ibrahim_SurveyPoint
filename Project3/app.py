@@ -522,6 +522,8 @@ def normalize_coords(df):
 @st.cache_data(show_spinner=False)
 def run_anomaly(df, contamination=0.05):
     df = normalize_coords(df).copy()
+    if "סוג" not in df.columns:
+        df["סוג"] = "חדשה"
     # סנן outliers קיצוניים לפני IsolationForest (מחוץ ל-4 סטיות תקן)
     for col in ["Y", "X"]:
         m, s = df[col].mean(), df[col].std()
