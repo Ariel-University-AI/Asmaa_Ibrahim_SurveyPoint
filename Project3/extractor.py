@@ -644,10 +644,10 @@ Y = צפון, X = מזרח — אל תחליף לעולם!
                         if 1000 <= x < 10000: x = float(str(x)[1:])
                         if y < 10000 and abs(y - x) < 1: continue
                         if not (name and y > 0 and x > 0): continue
-                        pt = item.get('type', 'new')
-                        if pt not in TYPE_HE: pt = 'new'
+                        pt = item.get('type', '')
+                        sug = TYPE_HE.get(pt, '')  # ריק אם לא סווג
                         pts.append({'שם נקודה': name, 'Y': y, 'X': x,
-                                    'סוג': TYPE_HE[pt]})
+                                    'סוג': sug})
                     except Exception:
                         pass
                 elapsed = time.time() - t0
@@ -739,9 +739,9 @@ Y = צפון, X = מזרח — אל תחליף לעולם!
                                 y = float(str(item.get('Y',0)).replace(',','.'))
                                 x = float(str(item.get('X',0)).replace(',','.'))
                                 if y > 0 and x > 0:
-                                    pt = item.get('type','new')
+                                    pt = item.get('type','')
                                     pts_c.append({'שם נקודה': name, 'Y': y, 'X': x,
-                                                  'סוג': TYPE_HE.get(pt,'חדשה')})
+                                                  'סוג': TYPE_HE.get(pt,'')})
                             except Exception: pass
                         if pts_c:
                             results[p] = pts_c

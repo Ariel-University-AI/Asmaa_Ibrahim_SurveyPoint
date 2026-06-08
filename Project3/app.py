@@ -522,8 +522,6 @@ def normalize_coords(df):
 @st.cache_data(show_spinner=False)
 def run_anomaly(df, contamination=0.05):
     df = normalize_coords(df).copy()
-    if "סוג" not in df.columns:
-        df["סוג"] = "חדשה"
     # סנן outliers קיצוניים לפני IsolationForest (מחוץ ל-4 סטיות תקן)
     for col in ["Y", "X"]:
         m, s = df[col].mean(), df[col].std()
@@ -640,8 +638,8 @@ def show_anomaly_chart(df_res):
     n_ok    = (df_res["pred"] == 1).sum()
     n_bad   = (df_res["pred"] == -1).sum()
     pct     = round(n_ok / n_total * 100, 1)
-    has_sug = "סוג" in df_res.columns
-    n_new   = (df_res["סוג"] == "חדשה").sum() if has_sug else n_total
+    has_sug = "סוג" in df_res.columns and df_res["סוג"].str.strip().any()
+    n_new   = (df_res["סוג"] == "חדשה").sum() if has_sug else 0
     n_old   = (df_res["סוג"] == "ישנה").sum()  if has_sug else 0
     n_known = (df_res["סוג"] == "ידועה").sum() if has_sug else 0
 
