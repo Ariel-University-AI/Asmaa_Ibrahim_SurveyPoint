@@ -6,3 +6,18 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# תמונות debug זמניות
+DATA/1/*.png
+DATA/2/*.png
+DATA/1/test_page3.png
+DATA/1/debug_yx_crop.png
+DATA/1/Data1_preview.png
+
+# קובץ התקנה
+Project3/tesseract-ocr-w64-setup-5.5.0.20241111 (1).exe
+
+# גרסאות ישנות של חילוץ
+coordinates_extracted.csv
+coordinates_extracted_new.csv
+coordinates_extracted_BEST_DATA1.csv
