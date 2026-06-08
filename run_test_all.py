@@ -64,6 +64,8 @@ for ds, info in DATASETS.items():
     orig = orig.dropna(subset=["Y","X"])
 
     ext = df_ext.copy()
+    # תמיכה ב-3 או 4 עמודות (עם/בלי סוג)
+    ext = ext.iloc[:, :3].copy()
     ext.columns = ["name","Y","X"]
     ext["name"] = ext["name"].astype(str).str.strip()
 
