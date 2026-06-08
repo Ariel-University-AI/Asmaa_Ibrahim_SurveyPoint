@@ -663,7 +663,7 @@ Y = צפון, X = מזרח — אל תחליף לעולם!
                 break
         return p, pts, has_headers
 
-    BATCH = 5
+    BATCH = 2
     results = {}
     result_meta = {}  # p -> has_headers
 
