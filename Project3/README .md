@@ -2,6 +2,13 @@
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://surveypoint-asmaa-ibrahim.streamlit.app)
 
+## 📸 Screenshots
+
+![Home](screenshots/home.png)
+![Anomaly Detection](screenshots/anomaly.png)
+![EDA](screenshots/eda.png)
+![Extraction Results](screenshots/extraction.png)
+
 # 📐 SurveyPoint — חילוץ קואורדינטות מתיקי חישובים וזיהוי שגיאות מדידה
 
 > אפליקציה שמקבלת תיק חישובים של מודד (TIF/PDF) ומחלצת אוטומטית קואורדינטות באמצעות Gemini Vision AI, מזהה נקודות חשודות, ומייצאת לCSV/Excel.
