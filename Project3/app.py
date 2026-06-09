@@ -852,6 +852,11 @@ border:1px solid rgba(0,212,255,0.4);border-radius:12px;padding:16px 20px;margin
             st.session_state["ocr_df"] = ocr_core if len(ocr_core) > 0 else None
             st.session_state["_demo_mode"] = False
 
+            # ניקוי פרטי תיק קודמים לפני חילוץ חדש
+            for _k in ["tik_num","tlr_num","tlr_year","gush","helka","tik_chish"]:
+                st.session_state[_k] = ""
+            st.session_state["_meta_set"] = False
+
             # חילוץ פרטי תיק מדף שער אוטומטי
             if gemini_key and len(df_ocr) > 0 and not fname.endswith(".pdf"):
                 with st.spinner("חולץ פרטי תיק מדף שער..."):
